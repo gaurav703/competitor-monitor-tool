@@ -13,31 +13,75 @@ const parser = new Parser({
 
 const MAX_ITEMS = 15;
 
+export type FeedItem = {
+  /** Stable identity for this item: feed GUID, else link, else title. */
+  key: string;
+  date: string;
+  title: string;
+  snippet: string;
+  link: string;
+};
+
+function itemKey(item: { guid?: string; link?: string; title?: string }): string {
+  const raw = item.guid?.trim() || item.link?.trim() || item.title?.trim() || "";
+  return normalizeWhitespace(raw);
+}
+
+function dateMs(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 export async function fetchBlogRss(url: string): Promise<WatchedContent> {
   const feed = await parser.parseURL(url);
   const items = (feed.items ?? []).slice(0, MAX_ITEMS);
-  const itemLines = items.map((item, index) => {
-    const date = item.isoDate ?? item.pubDate ?? "";
-    const title = item.title ?? "";
-    const snippet = item.contentSnippet ?? item.content ?? "";
-    return `${index}:${date}|${title}|${snippet}`;
-  });
+
+  const seen = new Set<string>();
+  const unique: FeedItem[] = [];
+  for (const item of items) {
+    const key = itemKey(item);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push({
+      key,
+      date: item.isoDate ?? item.pubDate ?? "",
+      title: item.title ?? "",
+      snippet: item.contentSnippet ?? item.content ?? "",
+      link: item.link ?? "",
+    });
+  }
+
+  // Order-independent: sorted by key so a feed reshuffle never changes the
+  // canonical text or the change-detection hash.
+  const sorted = [...unique].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+
+  const itemLines = sorted.map((item) =>
+    [item.key, item.date, item.title, item.snippet, item.link ? `link:${item.link}` : ""]
+      .filter(Boolean)
+      .join("|")
+  );
 
   const canonicalText = normalizeWhitespace(
     ["feed:" + (feed.title ?? ""), "link:" + (feed.link ?? ""), ...itemLines].join("\n")
   );
 
+  const latest = [...sorted].sort((a, b) => dateMs(b.date) - dateMs(a.date))[0];
+
   return {
     sourceType: "blog_rss" as SourceType,
     url,
     canonicalText,
+    itemKeys: sorted.map((item) => item.key),
     meta: {
       watcher: "blogRssWatcher",
       feedTitle: feed.title,
       feedLink: feed.link,
-      itemCount: items.length,
-      latestTitle: items[0]?.title,
-      latestDate: items[0]?.isoDate ?? items[0]?.pubDate,
+      itemCount: sorted.length,
+      latestTitle: latest?.title,
+      latestDate: latest?.date || undefined,
+      items: sorted,
     },
   };
 }

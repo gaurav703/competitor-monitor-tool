@@ -10,6 +10,9 @@ const competitorSourceSchema = new Schema(
     url: { type: String, required: true, trim: true },
     lastCheckedHash: { type: String, default: null },
     lastCheckedAt: { type: Date, default: null },
+    // Feed sources (blog_rss, news) only: stable per-item keys seen so far.
+    // Change detection hashes this set so feed reshuffles never trigger a diff.
+    lastSeenItemKeys: { type: [String], default: undefined },
   },
   { _id: true }
 );

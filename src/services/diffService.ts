@@ -4,6 +4,7 @@ import { ChangeLogModel, CompetitorModel, UserProductModel } from "../models";
 import type { SourceType } from "../models";
 import { fetchSource } from "../watchers";
 import type { WatchedContent } from "../watchers";
+import type { FeedItem } from "../watchers/blogRssWatcher";
 import { googleNewsRssUrl } from "../watchers/newsWatcher";
 import { analyzeChange } from "./aiAnalysisService";
 import type { ChangeAnalysis, UserProductContext } from "./aiAnalysisService";
@@ -46,8 +47,83 @@ function emptyAnalysisFields(): Pick<DiffCheckResult, "analyzed" | "changeLogId"
   return { analyzed: false, changeLogId: null, isMeaningful: null };
 }
 
+/** Cap on how many seen feed item keys we remember per source (drops oldest first). */
+const MAX_SEEN_FEED_KEYS = 500;
+
 export function hashContent(canonicalText: string): string {
   return createHash("sha256").update(canonicalText, "utf8").digest("hex");
+}
+
+/**
+ * Order-independent hash of a set of feed item keys. Two fetches with the same
+ * items in a different order produce the same hash, so reshuffles and headline
+ * rotation never look like a change.
+ */
+export function hashFeedKeys(keys: string[]): string {
+  const unique = [...new Set(keys)].sort();
+  return createHash("sha256").update(unique.join("\n"), "utf8").digest("hex");
+}
+
+/** Focused analysis content: only the items that are genuinely new. */
+function feedItemLines(items: FeedItem[]): string {
+  return items
+    .map((item) => {
+      const title = item.title ? `title: ${item.title}\n` : "";
+      const date = item.date ? `date: ${item.date}\n` : "";
+      const link = item.link ? `(source: ${item.link})` : "";
+      return `${title}${date}${item.snippet}${link}`.trim();
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export type FeedDiffResult = {
+  /** Hash of the next seen-key set (order-independent). */
+  currentHash: string;
+  /** The seen-key set to persist on the source. */
+  nextSeenKeys: string[];
+  isFirstCheck: boolean;
+  changed: boolean;
+  /** Keys present now but never seen before. */
+  newKeys: string[];
+  /** Items matching newKeys — what Gemini should actually look at. */
+  newItems: FeedItem[];
+};
+
+/**
+ * Order-independent change detection for feed sources.
+ * A reshuffle or headline rotation of already-seen items never counts as a
+ * change; only keys that have never been seen before trigger one.
+ */
+export function diffFeedItems(params: {
+  previousHash: string | null;
+  storedKeys: string[];
+  currentKeys: string[];
+  items: FeedItem[];
+}): FeedDiffResult {
+  const current = [...new Set(params.currentKeys)];
+  const currentSet = new Set(current);
+  const storedSet = new Set(params.storedKeys);
+  const newKeys = current.filter((key) => !storedSet.has(key));
+  // Order: every current feed key first (so a reshuffle or rotation never
+  // re-triggers them), then remaining history. The cap only evicts from the
+  // history tail, never a key that is in the feed right now.
+  const history = params.storedKeys.filter((key) => !currentSet.has(key));
+  const nextSeenKeys =
+    current.length >= MAX_SEEN_FEED_KEYS
+      ? current.slice(0, MAX_SEEN_FEED_KEYS)
+      : [...current, ...history].slice(0, MAX_SEEN_FEED_KEYS);
+  const currentHash = hashFeedKeys(nextSeenKeys);
+  // No stored keys yet (fresh source, or a pre-migration hash format) = baseline.
+  const isFirstCheck = params.storedKeys.length === 0;
+  const changed = isFirstCheck || params.previousHash !== currentHash;
+  const newItems =
+    newKeys.length > 0
+      ? params.items.filter((item) => newKeys.includes(item.key))
+      : isFirstCheck
+        ? params.items
+        : [];
+  return { currentHash, nextSeenKeys, isFirstCheck, changed, newKeys, newItems };
 }
 
 async function persistChangeLog(params: {
@@ -77,6 +153,7 @@ export async function checkSource(params: {
   sourceType: SourceType;
   url: string;
   lastCheckedHash: string | null;
+  lastSeenItemKeys?: string[];
   userProduct?: UserProductContext;
   analyze?: boolean;
 }): Promise<DiffCheckResult> {
@@ -91,20 +168,50 @@ export async function checkSource(params: {
 
   try {
     const watched: WatchedContent = await fetchSource(params.sourceType, params.url);
-    const currentHash = hashContent(watched.canonicalText);
-    const previousHash = params.lastCheckedHash;
-    const isFirstCheck = !previousHash;
-    const changed = isFirstCheck || previousHash !== currentHash;
     const fetchedAt = new Date();
+
+    const feedKeys = watched.itemKeys;
+    const isFeed = feedKeys !== undefined;
+
+    let currentHash: string;
+    let isFirstCheck: boolean;
+    let changed: boolean;
+    let diffContent: string;
+    let storedKeysNext: string[] | undefined;
+
+    if (feedKeys !== undefined) {
+      const items = (watched.meta.items as FeedItem[] | undefined) ?? [];
+      const feedDiff = diffFeedItems({
+        previousHash: params.lastCheckedHash,
+        storedKeys: params.lastSeenItemKeys ?? [],
+        currentKeys: feedKeys,
+        items,
+      });
+      currentHash = feedDiff.currentHash;
+      storedKeysNext = feedDiff.nextSeenKeys;
+      isFirstCheck = feedDiff.isFirstCheck;
+      changed = feedDiff.changed;
+      diffContent = feedItemLines(feedDiff.newItems);
+    } else {
+      currentHash = hashContent(watched.canonicalText);
+      isFirstCheck = !params.lastCheckedHash;
+      changed = isFirstCheck || params.lastCheckedHash !== currentHash;
+      diffContent = watched.canonicalText;
+    }
+
+    const previousHash = params.lastCheckedHash;
+
+    const setFields: Record<string, unknown> = {
+      "sources.$.lastCheckedHash": currentHash,
+      "sources.$.lastCheckedAt": fetchedAt,
+    };
+    if (isFeed && storedKeysNext) {
+      setFields["sources.$.lastSeenItemKeys"] = storedKeysNext;
+    }
 
     await CompetitorModel.updateOne(
       { _id: params.competitorId, "sources._id": params.sourceId },
-      {
-        $set: {
-          "sources.$.lastCheckedHash": currentHash,
-          "sources.$.lastCheckedAt": fetchedAt,
-        },
-      }
+      { $set: setFields }
     );
 
     const rawDiff: RawDiff | null = changed
@@ -115,7 +222,7 @@ export async function checkSource(params: {
           previousHash,
           currentHash,
           fetchedAt: fetchedAt.toISOString(),
-          content: watched.canonicalText,
+          content: diffContent,
           meta: watched.meta,
         }
       : null;
@@ -235,6 +342,7 @@ export async function runWatchForUserProduct(
         sourceType: source.type as SourceType,
         url: source.url,
         lastCheckedHash: source.lastCheckedHash ?? null,
+        lastSeenItemKeys: source.lastSeenItemKeys ?? [],
         userProduct,
         analyze,
       });
