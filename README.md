@@ -12,14 +12,18 @@ Anyone shipping a product who wants a short, relevant signal when a competitor s
 
 Four stages:
 
-1. **Watch** — Play Store “What’s New,” App Store release notes, any RSS feed, or a generic webpage.
+1. **Watch** — Play Store “What’s New,” App Store release notes, Google News RSS, any blog RSS feed, or a generic webpage.
 2. **Diff** — sha256 the canonical text and compare it to the last check. Unchanged sources skip everything else. The **first** successful fetch is a baseline (hash only; no Gemini).
 3. **Analyze** — Gemini acts as a competitive-intelligence analyst for *your* product: meaningful vs noise, 2–3 sentence summary, free-text area, urgency (`low` / `medium` / `high`) for **you**.
 4. **Notify** — a daily HTML email to `ownerEmail`, grouped by competitor. A local dashboard shows the same timeline. Slack is a later add.
 
+On a laptop, a long-running `npm run scheduler` process is the clock. In production on [Vercel](https://vercel.com), that process cannot stay alive, so [cron-job.org](https://cron-job.org) pings the app on a schedule instead.
+
 ```mermaid
 flowchart LR
+  CronJobOrg["cron-job.org"] --> CronRoute["/api/cron/run"]
   Scheduler --> Watchers
+  CronRoute --> Watchers
   Watchers --> DiffService
   DiffService --> Gemini
   Gemini --> ChangeLog
@@ -29,7 +33,26 @@ flowchart LR
   Dashboard --> MongoDB
 ```
 
-Frontend vs backend: the Node worker in `src/` does the watching, Gemini calls, and email. The Next.js app in `dashboard/` only saves configuration and reads the timeline. The browser never calls Gemini.
+Frontend vs backend: the Node worker in `src/` does the watching, Gemini calls, and email. The Next.js app in `dashboard/` saves configuration, reads the timeline, and (on Vercel) exposes `/api/cron/run` so an external cron can start that worker. The browser never calls Gemini.
+
+## cron-job.org (production clock)
+
+**What it is:** a free service that issues an HTTP GET to a URL at times you choose. It does not scrape Play Store, fetch news, or call Gemini.
+
+**Why we use it:** Vercel Hobby cannot run `npm run scheduler` (no always-on process). Vercel’s own cron is limited to **once per day**, but we need a watch every **12 hours** plus a daily digest. cron-job.org is only the alarm; Vercel still does the work.
+
+Create two GET jobs. Use the same `CRON_SECRET` as in Vercel environment variables (never commit it).
+
+| Job | What it does | URL | Schedule |
+| --- | --- | --- | --- |
+| `competitor-watch` | Fetch sources, hash, Gemini on real diffs | `https://YOUR_DOMAIN/api/cron/run?job=watch&secret=CRON_SECRET` | `0 */12 * * *` (every 12 hours) |
+| `competitor-digest` | Email meaningful changes to `ownerEmail` | `https://YOUR_DOMAIN/api/cron/run?job=digest&secret=CRON_SECRET` | `0 8 * * *` (daily; set timezone, e.g. Asia/Kolkata) |
+
+The endpoint returns **202** immediately so cron-job.org’s ~30s free timeout does not mark the job failed. The pipeline can keep running on Vercel for up to 5 minutes. Check **Vercel → Logs** for `[UNCHANGED]`, `[BASELINE]`, `[ANALYZED]`, and `[cron] watch finished`.
+
+Do not schedule watch every 15 minutes — that burns Gemini quota and store rate limits.
+
+On a laptop, skip cron-job.org and use `npm run scheduler` instead.
 
 ## Setup
 
@@ -46,6 +69,7 @@ cp .env.example .env
 - `MONGODB_URI`
 - `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`)
 - SMTP fields when you want email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`
+- `CRON_SECRET` when you deploy (protects `/api/cron/run`)
 
 Never commit `.env`.
 
@@ -69,7 +93,7 @@ Or open the dashboard (no login in v1):
 npm run dashboard
 ```
 
-Then visit `http://localhost:3000`. Add a competitor **by name only** — the backend looks up Play Store, App Store, website, and RSS (same idea as `E:\compitietor\discover.js`).
+Then visit `http://localhost:3000`. Add a competitor **by name only** — the backend looks up Play Store, App Store, website, RSS, and Google News.
 
 ## Useful commands
 
@@ -84,9 +108,9 @@ Then visit `http://localhost:3000`. Add a competitor **by name only** — the ba
 
 Force a new analysis after a baseline: set a source’s `lastCheckedHash` to something else in Mongo (e.g. `"force-diff"`), then `npm run watch-now`.
 
-## Lambda
+## Optional: Lambda
 
-`src/jobs/scheduler.ts` exports `handler`. Point a scheduled Lambda (or EventBridge) at it:
+`src/jobs/scheduler.ts` still exports `handler` if you prefer EventBridge instead of cron-job.org:
 
 ```ts
 import { handler } from "./jobs/scheduler";
