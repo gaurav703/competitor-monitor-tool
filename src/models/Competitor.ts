@@ -8,6 +8,9 @@ const competitorSourceSchema = new Schema(
   {
     type: { type: String, required: true, enum: SOURCE_TYPES },
     url: { type: String, required: true, trim: true },
+    // website sources only: scope the watcher to this CSS selector, so only
+    // changes inside that section count as a diff (ignores nav, banners, etc.).
+    selector: { type: String, default: null },
     lastCheckedHash: { type: String, default: null },
     lastCheckedAt: { type: Date, default: null },
     // Feed sources (blog_rss, news) only: stable per-item keys seen so far.

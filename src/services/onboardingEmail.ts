@@ -68,7 +68,7 @@ export async function liveStorePreviewsForCompetitor(
       continue;
     }
     try {
-      const watched = await fetchSource(source.type as SourceType, source.url);
+      const watched = await fetchSource(source.type as SourceType, source.url, source.selector ?? undefined);
       let summary = "";
       if (source.type === "playstore") {
         summary = snippet(String(watched.meta.recentChanges ?? watched.canonicalText));

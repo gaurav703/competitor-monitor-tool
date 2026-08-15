@@ -152,6 +152,7 @@ export async function checkSource(params: {
   sourceId: Types.ObjectId;
   sourceType: SourceType;
   url: string;
+  selector?: string | null;
   lastCheckedHash: string | null;
   lastSeenItemKeys?: string[];
   userProduct?: UserProductContext;
@@ -167,7 +168,11 @@ export async function checkSource(params: {
   };
 
   try {
-    const watched: WatchedContent = await fetchSource(params.sourceType, params.url);
+    const watched: WatchedContent = await fetchSource(
+      params.sourceType,
+      params.url,
+      params.selector ?? undefined
+    );
     const fetchedAt = new Date();
 
     const feedKeys = watched.itemKeys;
@@ -341,6 +346,7 @@ export async function runWatchForUserProduct(
         sourceId: source._id as Types.ObjectId,
         sourceType: source.type as SourceType,
         url: source.url,
+        selector: source.selector ?? null,
         lastCheckedHash: source.lastCheckedHash ?? null,
         lastSeenItemKeys: source.lastSeenItemKeys ?? [],
         userProduct,

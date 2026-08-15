@@ -18,8 +18,10 @@ const competitorSourceSchema = new Schema(
   {
     type: { type: String, required: true, enum: SOURCE_TYPES },
     url: { type: String, required: true, trim: true },
+    selector: { type: String, default: null },
     lastCheckedHash: { type: String, default: null },
     lastCheckedAt: { type: Date, default: null },
+    lastSeenItemKeys: { type: [String], default: undefined },
   },
   { _id: true }
 );

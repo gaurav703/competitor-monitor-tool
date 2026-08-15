@@ -69,14 +69,30 @@ async function fetchHtml(url: string): Promise<{ html: string; status: number }>
   throw new Error(lastError);
 }
 
-export async function fetchWebsite(url: string): Promise<WatchedContent> {
+export async function fetchWebsite(url: string, selector?: string): Promise<WatchedContent> {
   const { html, status } = await fetchHtml(url);
   const $ = cheerio.load(html);
   $("script, style, noscript, svg, iframe, link, meta").remove();
   const title = $("title").first().text();
-  const main = $("main, article, [role='main']").first();
-  const bodyText = (main.length ? main : $("body")).text();
-  const canonicalText = normalizeWhitespace(`title:${title}\n${bodyText}`);
+
+  let scopeText: string;
+  let usedSelector: string | null = null;
+
+  const trimmedSelector = selector?.trim();
+  if (trimmedSelector) {
+    const scoped = $(trimmedSelector);
+    if (scoped.length === 0) {
+      throw new Error(`CSS selector "${trimmedSelector}" matched nothing on ${url}`);
+    }
+    usedSelector = trimmedSelector;
+    scopeText = scoped.text();
+  } else {
+    const main = $("main, article, [role='main']").first();
+    const bodyText = (main.length ? main : $("body")).text();
+    scopeText = `title:${title}\n${bodyText}`;
+  }
+
+  const canonicalText = normalizeWhitespace(scopeText);
 
   return {
     sourceType: "website" as SourceType,
@@ -86,6 +102,7 @@ export async function fetchWebsite(url: string): Promise<WatchedContent> {
       watcher: "websiteWatcher",
       title,
       status,
+      selector: usedSelector,
       textLength: canonicalText.length,
     },
   };

@@ -20,11 +20,11 @@ The core loop works, but several watchers fire "changed" on content that is not 
 - **Problem:** `canonicalText` embeds `index:date|title|snippet` for the latest 15 items. A feed that reorders items or edits a timestamp triggers a false diff with no new content.
 - **Fix (implemented):** `fetchBlogRss` now keys items by GUID → link → title, sorts by key (order-independent canonical text), exposes `itemKeys` + `meta.items` on `WatchedContent`, and the diff service (1.1) analyzes only genuinely new items. Verified by `scripts/verify-feed-diff.ts` (run `npx tsx scripts/verify-feed-diff.ts`).
 
-### 1.3 Website watcher hashes the whole page — `open`
+### 1.3 Website watcher hashes the whole page — `done`
 
 - **Files:** `src/watchers/websiteWatcher.ts`
 - **Problem:** falls back to `<body>` text; cookie banners, nav changes, and dynamic widgets (prices, counts) change the hash without a real update.
-- **Fix:** let users scope a source to a CSS selector or a specific changelog path; at minimum keep the `<main>/<article>` preference as the default and make it configurable per source.
+- **Fix (implemented):** per-source **CSS selector scoping**. A `website` source can store a `selector` (`Competitor.sources[].selector`) and `fetchWebsite(url, selector)` hashes only that section's text — nav, banners, and widgets outside it are ignored. A selector that matches nothing fails loudly (`CSS selector "..." matched nothing on <url>`) so it shows up in watch logs instead of silently diffing the whole page. Wired through `fetchSource`/`checkSource`/`runWatchForUserProduct`, editable from the dashboard (`SourceSelector` component + `PATCH /api/sources`). Verified by `scripts/verify-website-selector.ts` (`npx tsx scripts/verify-website-selector.ts`).
 
 ### 1.4 No cross-source dedupe — `open`
 

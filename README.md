@@ -12,7 +12,7 @@ Anyone shipping a product who wants a short, relevant signal when a competitor s
 
 Four stages:
 
-1. **Watch** — Play Store “What’s New,” App Store release notes, Google News RSS, any blog RSS feed, or a generic webpage.
+1. **Watch** — Play Store “What’s New,” App Store release notes, Google News RSS, any blog RSS feed, or a generic webpage (optionally scoped to a CSS selector, so only changes inside e.g. the changelog section count).
 2. **Diff** — sha256 the canonical text and compare it to the last check. Unchanged sources skip everything else. For RSS/news feeds, change detection hashes the *set of item identities* instead of the whole feed, so reshuffles or rotating headlines never look like a change — only genuinely new items do. The **first** successful fetch is a baseline (hash only; no Gemini).
 3. **Analyze** — Gemini acts as a competitive-intelligence analyst for *your* product: meaningful vs noise, 2–3 sentence summary, free-text area, urgency (`low` / `medium` / `high`) for **you**.
 4. **Notify** — a daily HTML email to `ownerEmail`, grouped by competitor. A local dashboard shows the same timeline. Slack is a later add.

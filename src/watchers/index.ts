@@ -6,7 +6,7 @@ import { fetchPlayStore } from "./playStoreWatcher";
 import type { WatchedContent } from "./types";
 import { fetchWebsite } from "./websiteWatcher";
 
-export async function fetchSource(type: SourceType, url: string): Promise<WatchedContent> {
+export async function fetchSource(type: SourceType, url: string, selector?: string): Promise<WatchedContent> {
   switch (type) {
     case "playstore":
       return fetchPlayStore(url);
@@ -17,7 +17,7 @@ export async function fetchSource(type: SourceType, url: string): Promise<Watche
     case "news":
       return fetchNews(url);
     case "website":
-      return fetchWebsite(url);
+      return fetchWebsite(url, selector);
     default: {
       const exhaustive: never = type;
       throw new Error(`Unsupported source type: ${String(exhaustive)}`);

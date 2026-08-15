@@ -4,6 +4,7 @@ import { ChangeLogModel, CompetitorModel, UserProductModel, type CompetitorDoc }
 import { CompetitorForm } from "./CompetitorForm";
 import { EmailedUpdates } from "./EmailedUpdates";
 import { ProductForm } from "./ProductForm";
+import { SourceSelector } from "./SourceSelector";
 import { Timeline, type TimelineItem } from "./Timeline";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +113,13 @@ export default async function HomePage({
                       <a href={source.url} className="underline" target="_blank" rel="noreferrer">
                         {source.url}
                       </a>
+                      {source.type === "website" && source._id ? (
+                        <SourceSelector
+                          competitorId={competitor._id.toString()}
+                          sourceId={source._id.toString()}
+                          initialSelector={source.selector ?? ""}
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
