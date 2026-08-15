@@ -1,11 +1,12 @@
 import { createHash } from "crypto";
 import { Types } from "mongoose";
 import { ChangeLogModel, CompetitorModel, UserProductModel } from "../models";
-import type { SourceType } from "../models";
+import type { AnalysisStatus, SourceType } from "../models";
 import { fetchSource } from "../watchers";
 import type { WatchedContent } from "../watchers";
 import type { FeedItem } from "../watchers/blogRssWatcher";
 import { googleNewsRssUrl } from "../watchers/newsWatcher";
+import { AnalysisError } from "./geminiClient";
 import { analyzeChange } from "./aiAnalysisService";
 import type { ChangeAnalysis, UserProductContext } from "./aiAnalysisService";
 import { titlesFromRawDiff, titlesMatch } from "./dedupe";
@@ -152,6 +153,9 @@ async function persistChangeLog(params: {
   sourceType: SourceType;
   rawDiff: RawDiff;
   analysis: ChangeAnalysis;
+  analysisStatus?: AnalysisStatus;
+  analysisAttempts?: number;
+  analysisError?: string | null;
 }): Promise<string> {
   const doc = await ChangeLogModel.create({
     competitorId: params.competitorId,
@@ -163,6 +167,9 @@ async function persistChangeLog(params: {
     isMeaningful: params.analysis.isMeaningful,
     detectedAt: new Date(),
     notified: false,
+    analysisStatus: params.analysisStatus ?? "analyzed",
+    analysisAttempts: params.analysisAttempts ?? 0,
+    analysisError: params.analysisError ?? null,
   });
   return doc._id.toString();
 }
@@ -286,19 +293,47 @@ export async function checkSource(params: {
       params.userProduct &&
       (feedKeys === undefined || feedAnalysisItems.length > 0);
     if (shouldAnalyze && rawDiff && params.userProduct) {
-      const analysis = await analyzeChange(
-        params.userProduct,
-        params.competitorName,
-        params.sourceType,
-        rawDiff
-      );
-      analyzed = true;
-      isMeaningful = analysis.isMeaningful;
+      let analysis: ChangeAnalysis;
+      let analysisStatus: AnalysisStatus = "analyzed";
+      let analysisError: string | null = null;
+      try {
+        analysis = await analyzeChange(
+          params.userProduct,
+          params.competitorName,
+          params.sourceType,
+          rawDiff
+        );
+      } catch (error: unknown) {
+        if (error instanceof AnalysisError && error.retryable) {
+          // All Gemini models quota-limited. Save the rawDiff now as
+          // "pending" so analyzePending can retry without re-fetching.
+          console.warn(
+            `Analysis deferred (all Gemini models exhausted) for ${params.competitorName} ${params.sourceType}; saved as pending.`
+          );
+          analysis = {
+            isMeaningful: false,
+            aiSummary: null,
+            relevantArea: null,
+            urgency: null,
+          };
+          analysisStatus = "pending";
+          analysisError = error.message;
+        } else {
+          throw error;
+        }
+      }
+      if (analysisStatus === "analyzed") {
+        analyzed = true;
+        isMeaningful = analysis.isMeaningful;
+      }
       changeLogId = await persistChangeLog({
         competitorId: params.competitorId,
         sourceType: params.sourceType,
         rawDiff,
         analysis,
+        analysisStatus,
+        analysisAttempts: analysisStatus === "pending" ? 1 : 0,
+        analysisError,
       });
     }
 

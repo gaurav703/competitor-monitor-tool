@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/config/env.ts",
+    "src/services/geminiClient.ts",
+    "src/services/aiAnalysisService.ts",
+    "src/jobs/analyzePending.ts",
+    "src/models/**/*.ts",
+    "src/services/dedupe.ts"
+  ]
+}

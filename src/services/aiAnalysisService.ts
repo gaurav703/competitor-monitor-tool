@@ -1,7 +1,7 @@
 import { isGeminiConfigured } from "../config/env";
 import type { SourceType, Urgency } from "../models";
 import { URGENCY_LEVELS } from "../models";
-import { generateGeminiText } from "./geminiClient";
+import { AnalysisError, generateGeminiText } from "./geminiClient";
 
 export type UserProductContext = {
   name: string;
@@ -134,6 +134,11 @@ export async function analyzeChange(
     });
     return toAnalysis(extractJsonObject(text));
   } catch (error: unknown) {
+    if (error instanceof AnalysisError && error.retryable) {
+      // Every model hit a quota/transient error. Let the caller save the
+      // ChangeLog as "pending" so analyzePending can retry later.
+      throw error;
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Gemini analysis fallback: ${message}`);
     return FALLBACK;

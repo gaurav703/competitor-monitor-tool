@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { after, NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
+import { retryPendingAnalyses } from "../../../../../src/jobs/analyzePending";
 import { runDailyDigest } from "../../../../../src/jobs/dailyDigest";
 import { runWatchNow } from "../../../../../src/jobs/watchNow";
 
@@ -56,6 +57,7 @@ async function runCron(request: Request): Promise<Response> {
       await connectDb();
       if (job === "watch" || job === "all") {
         await runWatchNow();
+        await retryPendingAnalyses();
       }
       if (job === "digest" || job === "all") {
         await runDailyDigest();

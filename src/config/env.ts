@@ -19,6 +19,16 @@ function optional(name: string, fallback = ""): string {
 export const env = {
   geminiApiKey: optional("GEMINI_API_KEY"),
   geminiModel: optional("GEMINI_MODEL", "gemini-3.6-flash"),
+  /**
+   * Models tried after the primary when it hits a quota/transient error.
+   * Comma-separated env var (GEMINI_MODEL_FALLBACKS), e.g.
+   * "gemini-2.5-flash,gemini-2.0-flash". Empty by default, so the cascade
+   * is a no-op unless explicitly configured.
+   */
+  geminiModelFallbacks: optional("GEMINI_MODEL_FALLBACKS")
+    .split(",")
+    .map((model) => model.trim())
+    .filter(Boolean),
   mongodbUri: required("MONGODB_URI"),
   smtpHost: optional("SMTP_HOST"),
   smtpPort: Number(optional("SMTP_PORT", "587")),

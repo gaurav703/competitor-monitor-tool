@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { connectDb, disconnectDb } from "../config/db";
+import { retryPendingAnalyses } from "./analyzePending";
 import { runDailyDigest } from "./dailyDigest";
 import { runWatchNow } from "./watchNow";
 
@@ -17,6 +18,7 @@ export async function handler(event: HandlerEvent = {}): Promise<{ ok: true; job
   try {
     if (job === "watch" || job === "all") {
       await runWatchNow();
+      await retryPendingAnalyses();
     }
     if (job === "digest" || job === "all") {
       await runDailyDigest();
@@ -31,7 +33,10 @@ export function startScheduler(): void {
   cron.schedule("0 */12 * * *", () => {
     console.log(`[cron] 12h watch pipeline ${new Date().toISOString()}`);
     connectDb()
-      .then(() => runWatchNow())
+      .then(async () => {
+        await runWatchNow();
+        await retryPendingAnalyses();
+      })
       .catch((error: unknown) => {
         console.error(error);
       });
