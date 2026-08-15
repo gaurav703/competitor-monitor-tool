@@ -1,0 +1,4 @@
+{
+  "installCommand": "npm install && npm install --prefix ..",
+  "buildCommand": "node --max-old-space-size=8192 ./node_modules/next/dist/bin/next build"
+}

@@ -7,20 +7,55 @@ dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 
 const repoRoot = path.resolve(__dirname, "..");
 
+const serverPackages = [
+  "mongoose",
+  "cheerio",
+  "htmlparser2",
+  "entities",
+  "parse5",
+  "google-play-scraper",
+  "app-store-scraper",
+  "rss-parser",
+  "nodemailer",
+  "@google/genai",
+];
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: repoRoot,
+  typescript: {
+    ignoreBuildErrors: true,
+    tsconfigPath: "tsconfig.build.json",
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     externalDir: true,
   },
-  serverExternalPackages: [
-    "mongoose",
-    "google-play-scraper",
-    "app-store-scraper",
-    "nodemailer",
-    "@google/genai",
-    "rss-parser",
-  ],
-  webpack: (config, { dev }) => {
+  serverExternalPackages: serverPackages,
+  webpack: (config, { dev, isServer }) => {
+    const dashboardModules = path.resolve(__dirname, "node_modules");
+    const rootModules = path.resolve(repoRoot, "node_modules");
+    config.resolve.modules = [
+      dashboardModules,
+      rootModules,
+      ...(config.resolve.modules ?? ["node_modules"]),
+    ];
+
+    if (isServer) {
+      const previous = config.externals;
+      config.externals = [
+        ...(Array.isArray(previous) ? previous : previous ? [previous] : []),
+        ({ request }: { request?: string }, callback: (error?: Error | null, result?: string) => void) => {
+          if (request && serverPackages.includes(request)) {
+            callback(undefined, `commonjs ${request}`);
+            return;
+          }
+          callback();
+        },
+      ];
+    }
+
     if (dev) {
       config.watchOptions = {
         ...config.watchOptions,

@@ -1,4 +1,4 @@
-import mongoose, { Schema, model, models, type InferSchemaType, type Types } from "mongoose";
+import mongoose, { Schema, model, models, type InferSchemaType, type Model, type Types } from "mongoose";
 import { SOURCE_TYPES } from "./sourceTypes";
 
 export type { SourceType } from "./sourceTypes";
@@ -67,14 +67,14 @@ export type UserProductDoc = InferSchemaType<typeof userProductSchema> & { _id: 
 export type CompetitorDoc = InferSchemaType<typeof competitorSchema> & { _id: Types.ObjectId };
 export type ChangeLogDoc = InferSchemaType<typeof changeLogSchema> & { _id: Types.ObjectId };
 
-function registerModel(name: string, schema: Schema) {
+function registerModel<T>(name: string, schema: Schema): Model<T> {
   if (process.env.NODE_ENV !== "production" && models[name]) {
     delete models[name];
     delete mongoose.connection.models[name];
   }
-  return models[name] ?? model(name, schema);
+  return (models[name] as Model<T> | undefined) ?? model<T>(name, schema);
 }
 
-export const UserProductModel = registerModel("UserProduct", userProductSchema);
-export const CompetitorModel = registerModel("Competitor", competitorSchema);
-export const ChangeLogModel = registerModel("ChangeLog", changeLogSchema);
+export const UserProductModel = registerModel<UserProductDoc>("UserProduct", userProductSchema);
+export const CompetitorModel = registerModel<CompetitorDoc>("Competitor", competitorSchema);
+export const ChangeLogModel = registerModel<ChangeLogDoc>("ChangeLog", changeLogSchema);

@@ -12,7 +12,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "userProductId is required." }, { status: 400 });
   }
 
-  const competitors = await CompetitorModel.find({ userProductId }).lean();
+  const competitors = await CompetitorModel.find({ userProductId }).lean<{
+    _id: { toString(): string };
+    name: string;
+  }[]>();
   const competitorIds = competitors.map((row) => row._id);
   const nameById = new Map(competitors.map((row) => [row._id.toString(), row.name]));
 
@@ -21,7 +24,17 @@ export async function GET(request: Request) {
     query.isMeaningful = true;
   }
 
-  const logs = await ChangeLogModel.find(query).sort({ detectedAt: -1 }).lean();
+  const logs = await ChangeLogModel.find(query).sort({ detectedAt: -1 }).lean<{
+    _id: { toString(): string };
+    competitorId: { toString(): string };
+    rawDiff: { url?: string } | null;
+    sourceType: string;
+    detectedAt: Date;
+    relevantArea: string | null;
+    urgency: string | null;
+    aiSummary: string | null;
+    isMeaningful: boolean;
+  }[]>();
 
   const payload = logs.map((log) => {
     const raw = log.rawDiff as { url?: string } | null;
