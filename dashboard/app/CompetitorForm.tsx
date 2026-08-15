@@ -21,6 +21,8 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestStatus, setSuggestStatus] = useState<"loading" | "ready" | "error">("loading");
   const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestionsFromCache, setSuggestionsFromCache] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
 
   useEffect(() => {
@@ -28,9 +30,14 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
     setSuggestStatus("loading");
     setSuggestError(null);
     setPicked([]);
+    setSuggestionsFromCache(false);
     fetch(`/api/competitors/suggest?userProductId=${encodeURIComponent(userProductId)}`)
       .then(async (response) => {
-        const payload = (await response.json()) as { suggestions?: Suggestion[]; error?: string };
+        const payload = (await response.json()) as {
+          suggestions?: Suggestion[];
+          error?: string;
+          fromCache?: boolean;
+        };
         if (cancelled) {
           return;
         }
@@ -41,6 +48,7 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
           return;
         }
         setSuggestions(payload.suggestions ?? []);
+        setSuggestionsFromCache(Boolean(payload.fromCache));
         setSuggestStatus("ready");
       })
       .catch(() => {
@@ -53,6 +61,36 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
       cancelled = true;
     };
   }, [userProductId]);
+
+  async function refreshSuggestions() {
+    setRefreshing(true);
+    setSuggestError(null);
+    try {
+      const response = await fetch(
+        `/api/competitors/suggest?userProductId=${encodeURIComponent(userProductId)}&refresh=1`
+      );
+      const payload = (await response.json()) as {
+        suggestions?: Suggestion[];
+        error?: string;
+        fromCache?: boolean;
+      };
+      if (!response.ok) {
+        setSuggestError(payload.error ?? "Could not refresh suggestions.");
+        return;
+      }
+      if (payload.error) {
+        // Refresh failed but the saved list is still shown.
+        setSuggestError(payload.error);
+      }
+      setSuggestions(payload.suggestions ?? []);
+      setSuggestionsFromCache(Boolean(payload.fromCache));
+      setSuggestStatus("ready");
+    } catch {
+      setSuggestError("Could not refresh suggestions.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   function onPickFromDropdown(event: React.ChangeEvent<HTMLSelectElement>) {
     const name = event.target.value;
@@ -120,7 +158,17 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
       </p>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-stone-700">Suggested by Gemini</span>
+        <span className="mb-1 flex items-center justify-between text-stone-700">
+          Suggested by Gemini
+          <button
+            type="button"
+            onClick={refreshSuggestions}
+            disabled={suggestStatus === "loading" || refreshing}
+            className="text-xs font-medium text-stone-500 hover:text-stone-900 disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "↻ Refresh"}
+          </button>
+        </span>
         <select
           disabled={suggestStatus !== "ready" || suggestions.length === 0}
           onChange={onPickFromDropdown}
@@ -130,9 +178,11 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
           <option value="">
             {suggestStatus === "loading"
               ? "Asking Gemini…"
-              : suggestions.length === 0
-                ? "No suggestions"
-                : "Select a competitor…"}
+              : refreshing
+                ? "Refreshing…"
+                : suggestions.length === 0
+                  ? "No suggestions"
+                  : "Select a competitor…"}
           </option>
           {suggestions.map((row) => (
             <option key={row.name} value={row.name} title={row.why}>
@@ -142,6 +192,9 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
         </select>
       </label>
       {suggestError ? <p className="text-xs text-red-700">{suggestError}</p> : null}
+      {suggestionsFromCache && !suggestError ? (
+        <p className="text-xs text-stone-400">Showing saved suggestions — hit Refresh for new picks.</p>
+      ) : null}
       {picked.length > 0 ? (
         <ul className="flex flex-wrap gap-2">
           {picked.map((name) => (

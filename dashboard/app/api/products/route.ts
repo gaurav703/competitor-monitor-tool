@@ -47,17 +47,31 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
 
-  const update: Record<string, string> = {};
-  if (typeof body.name === "string" && body.name.trim()) update.name = body.name.trim();
-  if (typeof body.industry === "string" && body.industry.trim()) update.industry = body.industry.trim();
+  const update: Record<string, unknown> = {};
+  let productEdited = false;
+  if (typeof body.name === "string" && body.name.trim()) {
+    update.name = body.name.trim();
+    productEdited = true;
+  }
+  if (typeof body.industry === "string" && body.industry.trim()) {
+    update.industry = body.industry.trim();
+    productEdited = true;
+  }
   if (typeof body.description === "string" && body.description.trim()) {
     update.description = body.description.trim();
+    productEdited = true;
   }
   if (typeof body.ownerEmail === "string" && body.ownerEmail.trim()) {
     update.ownerEmail = body.ownerEmail.trim();
   }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "No fields to update." }, { status: 400 });
+  }
+  if (productEdited) {
+    // Suggestions depend on the product profile; drop them so the next
+    // form visit regenerates instead of serving stale picks.
+    update.suggestedCompetitors = [];
+    update.suggestedAt = null;
   }
 
   const updated = await UserProductModel.findByIdAndUpdate(id, { $set: update }, { new: true });
