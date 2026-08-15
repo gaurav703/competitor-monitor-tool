@@ -1,5 +1,6 @@
-import { Schema, model, type InferSchemaType, type Types } from "mongoose";
+import { Schema, type InferSchemaType, type Types } from "mongoose";
 import { SOURCE_TYPES } from "./Competitor";
+import { registerModel } from "./registerModel";
 
 export const URGENCY_LEVELS = ["low", "medium", "high"] as const;
 export type Urgency = (typeof URGENCY_LEVELS)[number];
@@ -28,4 +29,4 @@ export type ChangeLog = InferSchemaType<typeof changeLogSchema> & {
   _id: Types.ObjectId;
 };
 
-export const ChangeLogModel = model("ChangeLog", changeLogSchema);
+export const ChangeLogModel = registerModel<ChangeLog>("ChangeLog", changeLogSchema);

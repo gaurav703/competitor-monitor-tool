@@ -1,4 +1,5 @@
-import { Schema, model, type InferSchemaType, type Types } from "mongoose";
+import { Schema, type InferSchemaType, type Types } from "mongoose";
+import { registerModel } from "./registerModel";
 
 export const SOURCE_TYPES = ["playstore", "appstore", "blog_rss", "website", "news"] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
@@ -47,4 +48,4 @@ export type Competitor = InferSchemaType<typeof competitorSchema> & {
   _id: Types.ObjectId;
 };
 
-export const CompetitorModel = model("Competitor", competitorSchema);
+export const CompetitorModel = registerModel<Competitor>("Competitor", competitorSchema);

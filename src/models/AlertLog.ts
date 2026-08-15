@@ -1,4 +1,5 @@
-import { Schema, model, type InferSchemaType, type Types } from "mongoose";
+import { Schema, type InferSchemaType, type Types } from "mongoose";
+import { registerModel } from "./registerModel";
 
 export const ALERT_CHANNELS = ["email", "slack"] as const;
 export type AlertChannel = (typeof ALERT_CHANNELS)[number];
@@ -23,4 +24,4 @@ export type AlertLog = InferSchemaType<typeof alertLogSchema> & {
   _id: Types.ObjectId;
 };
 
-export const AlertLogModel = model("AlertLog", alertLogSchema);
+export const AlertLogModel = registerModel<AlertLog>("AlertLog", alertLogSchema);
