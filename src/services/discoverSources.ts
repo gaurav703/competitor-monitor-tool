@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { googleNewsRssUrl } from "../watchers/newsWatcher";
+import { importEsm } from "../watchers/importEsm";
 
 type SourceType = "playstore" | "appstore" | "blog_rss" | "website" | "news";
 
@@ -94,8 +95,12 @@ type PlayScraper = {
 };
 
 async function loadPlayScraper(): Promise<PlayScraper> {
-  const mod = (await import("google-play-scraper")) as { default: PlayScraper };
-  return mod.default;
+  const mod = await importEsm<{ default?: PlayScraper } & PlayScraper>("google-play-scraper");
+  const gplay = mod.default ?? mod;
+  if (!gplay?.app || !gplay.search) {
+    throw new Error("google-play-scraper did not export search()/app()");
+  }
+  return gplay;
 }
 
 async function fetchText(url: string, timeoutMs: number): Promise<{ ok: boolean; contentType: string; body: string }> {

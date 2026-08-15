@@ -1,10 +1,25 @@
 import type { SourceType } from "../models";
+import { importEsm } from "./importEsm";
 import { extractPlayStoreAppId, normalizeWhitespace } from "./parseSource";
 import type { WatchedContent } from "./types";
 
-async function loadPlayScraper() {
-  const mod = await import("google-play-scraper");
-  return mod.default;
+type PlayScraper = {
+  app: (opts: { appId: string; lang?: string; country?: string }) => Promise<{
+    title?: string;
+    recentChanges?: string;
+    version?: string;
+    updated?: string;
+    url?: string;
+  }>;
+};
+
+async function loadPlayScraper(): Promise<PlayScraper> {
+  const mod = await importEsm<{ default?: PlayScraper } & PlayScraper>("google-play-scraper");
+  const gplay = mod.default ?? mod;
+  if (!gplay?.app) {
+    throw new Error("google-play-scraper did not export app()");
+  }
+  return gplay;
 }
 
 export async function fetchPlayStore(url: string): Promise<WatchedContent> {

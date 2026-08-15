@@ -47,6 +47,10 @@ const nextConfig: NextConfig = {
       config.externals = [
         ...(Array.isArray(previous) ? previous : previous ? [previous] : []),
         ({ request }: { request?: string }, callback: (error?: Error | null, result?: string) => void) => {
+          if (request === "google-play-scraper") {
+            callback(undefined, `import ${request}`);
+            return;
+          }
           if (request && serverPackages.includes(request)) {
             callback(undefined, `commonjs ${request}`);
             return;
