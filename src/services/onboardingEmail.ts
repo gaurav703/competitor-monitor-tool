@@ -1,6 +1,6 @@
 import type { Competitor, SourceType, UserProduct } from "../models";
 import { fetchSource } from "../watchers";
-import { escapeHtml, sendMail } from "./mailer";
+import { escapeHtml, sendMail, updateTagHtml } from "./mailer";
 
 type ProductEmail = Pick<UserProduct, "name" | "ownerEmail">;
 
@@ -13,6 +13,7 @@ export type PreviewUpdate = {
   sourceUrl: string;
   detectedAt?: Date;
   relevantArea?: string | null;
+  urgency?: string | null;
 };
 
 function snippet(text: string, max = 280): string {
@@ -176,13 +177,19 @@ export async function sendCompetitorsAddedEmail(
               .slice(0, 2)
               .map((item) => {
                 const when = formatUpdateDate(item.detectedAt) || "Date unavailable";
-                const area = item.relevantArea ? ` · ${escapeHtml(item.relevantArea)}` : "";
+                const tags = updateTagHtml({
+                  relevantArea: item.relevantArea,
+                  urgency: item.urgency,
+                  sourceType: item.sourceType,
+                });
                 const link = item.sourceUrl
-                  ? `<div style="margin-top:4px;font-size:12px;"><a href="${escapeHtml(item.sourceUrl)}">Source</a></div>`
+                  ? `<div style="margin-top:8px;font-size:12px;"><a href="${escapeHtml(item.sourceUrl)}">Source</a></div>`
                   : "";
-                return `<div style="padding:12px;border:1px solid #e5e7eb;margin:8px 0;">
-                  <div style="font-size:12px;color:#6b7280;">${escapeHtml(item.sourceType)} · ${when}${area}</div>
-                  <p style="margin:8px 0 0;white-space:pre-wrap;">${escapeHtml(item.summary)}</p>
+                return `<div style="padding:12px;border:1px solid #e7e5e4;border-radius:8px;margin:8px 0;">
+                  <div style="font-size:12px;color:#78716c;margin-bottom:8px;">
+                    <span>${escapeHtml(when)}</span> ${tags}
+                  </div>
+                  <p style="margin:0;white-space:pre-wrap;">${escapeHtml(item.summary)}</p>
                   ${link}
                 </div>`;
               })
@@ -221,6 +228,8 @@ export function emailedUpdatesPayload(competitorName: string, updates: PreviewUp
       summary: item.summary,
       sourceUrl: item.sourceUrl,
       detectedAt: item.detectedAt ?? null,
+      relevantArea: item.relevantArea ?? null,
+      urgency: item.urgency ?? null,
       emailedAt,
       emailSent,
     }));

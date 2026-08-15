@@ -124,6 +124,7 @@ async function addCompetitor() {
         sourceUrl: raw?.url ?? "",
         detectedAt: log.detectedAt,
         relevantArea: log.relevantArea,
+        urgency: log.urgency,
       };
     });
     const added = {

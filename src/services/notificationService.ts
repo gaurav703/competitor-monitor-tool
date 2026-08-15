@@ -2,7 +2,7 @@ import { isSmtpConfigured } from "../config/env";
 import { AlertLogModel, ChangeLogModel, CompetitorModel, UserProductModel } from "../models";
 import type { ChangeLog, UserProduct } from "../models";
 import { dedupeLogsByTitle } from "./dedupe";
-import { escapeHtml, sendMail } from "./mailer";
+import { escapeHtml, sendMail, updateTagHtml } from "./mailer";
 
 export type DigestChange = {
   _id: ChangeLog["_id"];
@@ -16,49 +16,34 @@ export type DigestChange = {
   sourceUrl?: string;
 };
 
-function urgencyLabel(urgency: string | null): string {
-  if (urgency === "high") {
-    return "High";
-  }
-  if (urgency === "medium") {
-    return "Medium";
-  }
-  return "Low";
-}
-
 function buildHtml(productName: string, grouped: Map<string, DigestChange[]>): string {
   const sections: string[] = [];
   for (const [competitorName, items] of grouped) {
-    const rows = items
+    const cards = items
       .map((item) => {
-        const when = item.detectedAt.toISOString().slice(0, 10);
+        const when = item.detectedAt.toLocaleString();
         const summary = escapeHtml(item.aiSummary ?? "(no summary)");
-        const area = escapeHtml(item.relevantArea ?? "unspecified");
+        const tags = updateTagHtml({
+          relevantArea: item.relevantArea,
+          urgency: item.urgency ?? "low",
+          sourceType: item.sourceType,
+        });
         const link = item.sourceUrl
-          ? `<div style="margin-top:4px;font-size:12px;"><a href="${escapeHtml(item.sourceUrl)}">Source</a></div>`
+          ? `<div style="margin-top:8px;font-size:12px;"><a href="${escapeHtml(item.sourceUrl)}">Source</a></div>`
           : "";
-        return `<tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;white-space:nowrap;">${when}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${area}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${urgencyLabel(item.urgency)}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${summary}${link}</td>
-        </tr>`;
+        return `<div style="padding:16px;border:1px solid #e7e5e4;border-radius:8px;margin:0 0 12px;background:#fff;">
+          <div style="font-size:12px;color:#78716c;margin-bottom:8px;">
+            <span>${escapeHtml(when)}</span> ${tags}
+          </div>
+          <p style="margin:0;font-size:14px;line-height:1.5;white-space:pre-wrap;">${summary}</p>
+          ${link}
+        </div>`;
       })
       .join("");
 
     sections.push(`
       <h2 style="font-size:16px;margin:24px 0 8px;">${escapeHtml(competitorName)}</h2>
-      <table style="border-collapse:collapse;width:100%;font-size:14px;">
-        <thead>
-          <tr style="background:#f3f4f6;text-align:left;">
-            <th style="padding:8px 12px;">Date</th>
-            <th style="padding:8px 12px;">Area</th>
-            <th style="padding:8px 12px;">Urgency</th>
-            <th style="padding:8px 12px;">Summary</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>`);
+      ${cards}`);
   }
 
   return `<!DOCTYPE html>

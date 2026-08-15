@@ -119,6 +119,7 @@ export async function POST(request: Request) {
         sourceUrl: raw?.url ?? "",
         detectedAt: log.detectedAt,
         relevantArea: log.relevantArea,
+        urgency: log.urgency,
       };
     });
     const updates = await resolveLastTwoUpdates(createdCompetitors, existingLogs);

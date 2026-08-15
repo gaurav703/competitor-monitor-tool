@@ -28,6 +28,8 @@ const emailedUpdateSchema = new Schema(
     summary: { type: String, required: true },
     sourceUrl: { type: String, default: "" },
     detectedAt: { type: Date, default: null },
+    relevantArea: { type: String, default: null },
+    urgency: { type: String, default: null },
     emailedAt: { type: Date, default: null },
     emailSent: { type: Boolean, required: true, default: false },
   },
