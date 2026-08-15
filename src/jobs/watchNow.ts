@@ -22,6 +22,10 @@ export async function runWatchNow(): Promise<void> {
       console.log(`[UNCHANGED] ${row.competitorName} ${row.sourceType}`);
       continue;
     }
+    if (row.deduped) {
+      console.log(`[DUPLICATE] ${row.competitorName} ${row.sourceType} skipped as duplicate of a recent change`);
+      continue;
+    }
     console.log(
       `[ANALYZED] ${row.competitorName} ${row.sourceType} meaningful=${row.isMeaningful} changeLog=${row.changeLogId}`
     );

@@ -8,6 +8,7 @@ import type { FeedItem } from "../watchers/blogRssWatcher";
 import { googleNewsRssUrl } from "../watchers/newsWatcher";
 import { analyzeChange } from "./aiAnalysisService";
 import type { ChangeAnalysis, UserProductContext } from "./aiAnalysisService";
+import { titlesFromRawDiff, titlesMatch } from "./dedupe";
 
 export type RawDiff = {
   sourceType: SourceType;
@@ -41,6 +42,8 @@ export type DiffCheckResult = {
   analyzed: boolean;
   changeLogId: string | null;
   isMeaningful: boolean | null;
+  /** True when feed items were skipped because they duplicate a recent change. */
+  deduped: boolean;
 };
 
 function emptyAnalysisFields(): Pick<DiffCheckResult, "analyzed" | "changeLogId" | "isMeaningful"> {
@@ -49,6 +52,22 @@ function emptyAnalysisFields(): Pick<DiffCheckResult, "analyzed" | "changeLogId"
 
 /** Cap on how many seen feed item keys we remember per source (drops oldest first). */
 const MAX_SEEN_FEED_KEYS = 500;
+
+/** How far back to look for the same story already analyzed for a competitor. */
+const DEDUPE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Normalized titles of feed items already analyzed for this competitor. */
+async function recentChangeLogTitles(competitorId: Types.ObjectId): Promise<string[]> {
+  const since = new Date(Date.now() - DEDUPE_WINDOW_MS);
+  const logs = await ChangeLogModel.find({ competitorId, detectedAt: { $gte: since } })
+    .select("rawDiff")
+    .lean();
+  const titles: string[] = [];
+  for (const log of logs) {
+    titles.push(...titlesFromRawDiff(log.rawDiff));
+  }
+  return titles;
+}
 
 export function hashContent(canonicalText: string): string {
   return createHash("sha256").update(canonicalText, "utf8").digest("hex");
@@ -183,6 +202,9 @@ export async function checkSource(params: {
     let changed: boolean;
     let diffContent: string;
     let storedKeysNext: string[] | undefined;
+    let deduped = false;
+    let feedAnalysisItems: FeedItem[] = [];
+    let rawDiffMeta: Record<string, unknown> = watched.meta;
 
     if (feedKeys !== undefined) {
       const items = (watched.meta.items as FeedItem[] | undefined) ?? [];
@@ -196,7 +218,25 @@ export async function checkSource(params: {
       storedKeysNext = feedDiff.nextSeenKeys;
       isFirstCheck = feedDiff.isFirstCheck;
       changed = feedDiff.changed;
-      diffContent = feedItemLines(feedDiff.newItems);
+
+      feedAnalysisItems = feedDiff.newItems;
+      if (analyze && !isFirstCheck && feedAnalysisItems.length > 0) {
+        try {
+          const recent = await recentChangeLogTitles(params.competitorId);
+          const fresh = feedAnalysisItems.filter(
+            (item) => !recent.some((existing) => titlesMatch(existing, item.title))
+          );
+          deduped = feedAnalysisItems.length > fresh.length;
+          feedAnalysisItems = fresh;
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`Dedupe check skipped for ${params.competitorName}: ${message}`);
+        }
+      }
+      diffContent = feedItemLines(feedAnalysisItems);
+      // Persist only the analyzed items so future dedupe compares against the
+      // items that were actually analyzed, not the whole feed.
+      rawDiffMeta = { ...watched.meta, items: feedAnalysisItems };
     } else {
       currentHash = hashContent(watched.canonicalText);
       isFirstCheck = !params.lastCheckedHash;
@@ -228,7 +268,7 @@ export async function checkSource(params: {
           currentHash,
           fetchedAt: fetchedAt.toISOString(),
           content: diffContent,
-          meta: watched.meta,
+          meta: rawDiffMeta,
         }
       : null;
 
@@ -236,7 +276,13 @@ export async function checkSource(params: {
     let changeLogId: string | null = null;
     let isMeaningful: boolean | null = null;
 
-    const shouldAnalyze = analyze && changed && !isFirstCheck && rawDiff && params.userProduct;
+    const shouldAnalyze =
+      analyze &&
+      changed &&
+      !isFirstCheck &&
+      rawDiff &&
+      params.userProduct &&
+      (feedKeys === undefined || feedAnalysisItems.length > 0);
     if (shouldAnalyze && rawDiff && params.userProduct) {
       const analysis = await analyzeChange(
         params.userProduct,
@@ -266,6 +312,7 @@ export async function checkSource(params: {
       analyzed,
       changeLogId,
       isMeaningful,
+      deduped,
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -279,6 +326,7 @@ export async function checkSource(params: {
       rawDiff: null,
       error: message,
       ...emptyAnalysisFields(),
+      deduped: false,
     };
   }
 }
@@ -336,6 +384,7 @@ export async function runWatchForUserProduct(
           rawDiff: null,
           error: "Source is missing _id; cannot update hash.",
           ...emptyAnalysisFields(),
+          deduped: false,
         });
         continue;
       }

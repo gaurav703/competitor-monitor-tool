@@ -26,11 +26,11 @@ The core loop works, but several watchers fire "changed" on content that is not 
 - **Problem:** falls back to `<body>` text; cookie banners, nav changes, and dynamic widgets (prices, counts) change the hash without a real update.
 - **Fix (implemented):** per-source **CSS selector scoping**. A `website` source can store a `selector` (`Competitor.sources[].selector`) and `fetchWebsite(url, selector)` hashes only that section's text — nav, banners, and widgets outside it are ignored. A selector that matches nothing fails loudly (`CSS selector "..." matched nothing on <url>`) so it shows up in watch logs instead of silently diffing the whole page. Wired through `fetchSource`/`checkSource`/`runWatchForUserProduct`, editable from the dashboard (`SourceSelector` component + `PATCH /api/sources`). Verified by `scripts/verify-website-selector.ts` (`npx tsx scripts/verify-website-selector.ts`).
 
-### 1.4 No cross-source dedupe — `open`
+### 1.4 No cross-source dedupe — `done`
 
-- **Files:** `src/services/aiAnalysisService.ts`, `src/services/diffService.ts`
+- **Files:** `src/services/dedupe.ts` (new), `src/services/diffService.ts`, `src/services/notificationService.ts`
 - **Problem:** the same news item can arrive via Google News *and* a competitor's blog RSS, get analyzed twice, and appear twice in the digest.
-- **Fix:** dedupe by normalized title/hash before analysis or before the digest.
+- **Fix (implemented):** shared helpers in `src/services/dedupe.ts` match stories by normalized title (lowercase, punctuation-stripped, trailing " - Publisher" segments removed, plus containment for ≥15-char titles). Two layers: (1) before analysis, `diffService` skips feed items whose title was already analyzed for the same competitor within 7 days (saves the Gemini call; `[DUPLICATE]` in watch logs); (2) at digest time, `notificationService` drops duplicate-titled ChangeLogs per competitor before emailing (safety net that also cleans up legacy duplicates). Persisted ChangeLogs now store only the analyzed items in `rawDiff.meta.items` so dedupe compares against what was actually analyzed. Verified by `scripts/verify-dedupe.ts` (`npx tsx scripts/verify-dedupe.ts`).
 
 ## 2. Dashboard control — v1 is add-only
 

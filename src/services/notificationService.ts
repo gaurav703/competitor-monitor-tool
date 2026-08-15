@@ -1,6 +1,7 @@
 import { isSmtpConfigured } from "../config/env";
 import { AlertLogModel, ChangeLogModel, CompetitorModel, UserProductModel } from "../models";
 import type { ChangeLog, UserProduct } from "../models";
+import { dedupeLogsByTitle } from "./dedupe";
 import { escapeHtml, sendMail } from "./mailer";
 
 export type DigestChange = {
@@ -151,7 +152,15 @@ export async function sendDigestsForAllProducts(): Promise<void> {
       .sort({ detectedAt: -1 })
       .lean();
 
-    const digestItems: DigestChange[] = logs.map((log) => {
+    // Cross-source safety net: the same story via Google News and a blog RSS
+    // should appear once in the email, not twice. Keeps the most recent.
+    const dedupedLogs = dedupeLogsByTitle(logs);
+    const dedupeCount = logs.length - dedupedLogs.length;
+    if (dedupeCount > 0) {
+      console.log(`Digest for ${product.name}: skipped ${dedupeCount} duplicate(s) by title`);
+    }
+
+    const digestItems: DigestChange[] = dedupedLogs.map((log) => {
       const raw = log.rawDiff as { url?: string } | null;
       return {
         _id: log._id,
