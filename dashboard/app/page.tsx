@@ -8,7 +8,7 @@ import { EmailedUpdates } from "./EmailedUpdates";
 import { ProductForm } from "./ProductForm";
 import { SourceActions } from "./SourceActions";
 import { SourceSelector } from "./SourceSelector";
-import { Timeline, type TimelineItem } from "./Timeline";
+import { TimelineSection } from "./TimelineSection";
 import { WatchButton } from "./WatchButton";
 
 export const dynamic = "force-dynamic";
@@ -24,20 +24,43 @@ export default async function HomePage({
   const selectedId = params.userProductId ?? products[0]?._id.toString();
   const selected = products.find((product) => product._id.toString() === selectedId) ?? products[0];
 
-  let items: TimelineItem[] = [];
+  let initialItems: {
+    id: string;
+    competitorName: string;
+    detectedAt: string;
+    relevantArea: string | null;
+    urgency: string | null;
+    aiSummary: string | null;
+    sourceType: string;
+    sourceUrl: string | null;
+    isMeaningful: boolean;
+    rawDiffContent: string | null;
+  }[] = [];
+  let initialTotal = 0;
   let competitors: CompetitorDoc[] = [];
+  let competitorOptions: { id: string; name: string }[] = [];
+
   if (selected) {
     competitors = (await CompetitorModel.find({ userProductId: selected._id }).lean()) as CompetitorDoc[];
+    competitorOptions = competitors.map((row) => ({ id: row._id.toString(), name: row.name }));
     const nameById = new Map(competitors.map((row) => [row._id.toString(), row.name]));
-    const logs = await ChangeLogModel.find({
+
+    const query = {
       competitorId: { $in: competitors.map((row) => row._id) },
       isMeaningful: true,
-    })
-      .sort({ detectedAt: -1 })
-      .lean();
+    };
 
-    items = logs.map((log) => {
-      const raw = log.rawDiff as { url?: string } | null;
+    const [total, logs] = await Promise.all([
+      ChangeLogModel.countDocuments(query),
+      ChangeLogModel.find(query)
+        .sort({ detectedAt: -1 })
+        .limit(50)
+        .lean(),
+    ]);
+
+    initialTotal = total;
+    initialItems = logs.map((log) => {
+      const raw = log.rawDiff as { url?: string; content?: string } | null;
       return {
         id: log._id.toString(),
         competitorName: nameById.get(log.competitorId.toString()) ?? "Unknown",
@@ -48,6 +71,7 @@ export default async function HomePage({
         sourceType: log.sourceType,
         sourceUrl: raw?.url ?? null,
         isMeaningful: log.isMeaningful,
+        rawDiffContent: raw?.content ?? null,
       };
     });
   }
@@ -167,7 +191,12 @@ export default async function HomePage({
       {selected ? (
         <section>
           <h2 className="mb-4 font-serif text-2xl">Timeline · {selected.name}</h2>
-          <Timeline items={items} />
+          <TimelineSection
+            userProductId={selected._id.toString()}
+            competitors={competitorOptions}
+            initialItems={initialItems}
+            initialTotal={initialTotal}
+          />
         </section>
       ) : null}
     </main>

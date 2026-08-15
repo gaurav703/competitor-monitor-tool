@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 function urgencyClass(urgency: string | null): string {
   if (urgency === "high") {
     return "bg-red-100 text-red-800";
@@ -18,7 +22,41 @@ export type TimelineItem = {
   sourceType: string;
   sourceUrl: string | null;
   isMeaningful: boolean;
+  rawDiffContent: string | null;
 };
+
+function DiffToggle({ content }: { content: string }) {
+  const [open, setOpen] = useState(false);
+  const preview = content.length > 120 ? content.slice(0, 120) + "…" : content;
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs font-medium text-stone-600 hover:text-stone-900"
+      >
+        <svg
+          className={`h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        {open ? "Hide diff" : "Show diff"}
+      </button>
+      {!open ? (
+        <p className="mt-1 text-xs text-stone-400">{preview}</p>
+      ) : (
+        <pre className="mt-2 max-h-72 overflow-auto rounded-md bg-stone-50 p-3 text-xs leading-relaxed text-stone-700 whitespace-pre-wrap">
+          {content}
+        </pre>
+      )}
+    </div>
+  );
+}
 
 export function Timeline({ items }: { items: TimelineItem[] }) {
   const grouped = new Map<string, TimelineItem[]>();
@@ -52,6 +90,7 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
                   <span className="text-stone-400">{item.sourceType}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-stone-800">{item.aiSummary ?? "No summary."}</p>
+                {item.rawDiffContent ? <DiffToggle content={item.rawDiffContent} /> : null}
                 {item.sourceUrl ? (
                   <a href={item.sourceUrl} className="mt-2 inline-block text-xs text-stone-500 underline" target="_blank" rel="noreferrer">
                     Source
