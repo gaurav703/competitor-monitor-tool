@@ -1,0 +1,32 @@
+{
+  "name": "competitor-monitor-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000"
+  },
+  "dependencies": {
+    "@google/genai": "^2.3.0",
+    "app-store-scraper": "^0.18.0",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "google-play-scraper": "^10.0.1",
+    "mongoose": "^8.9.5",
+    "next": "^15.1.6",
+    "nodemailer": "^6.9.16",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

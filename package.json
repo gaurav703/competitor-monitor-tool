@@ -1,0 +1,41 @@
+{
+  "name": "competitor-monitor",
+  "version": "0.1.0",
+  "description": "Industry-agnostic competitor monitoring: watch sources, analyze with Gemini, email a daily digest.",
+  "private": true,
+  "main": "dist/jobs/scheduler.js",
+  "scripts": {
+    "dev": "tsx src/jobs/scheduler.ts",
+    "build": "tsc",
+    "start": "node dist/jobs/scheduler.js",
+    "status": "tsx src/index.ts",
+    "add-competitor": "tsx src/jobs/addCompetitor.ts",
+    "test-watch": "tsx src/jobs/testWatch.ts",
+    "watch-now": "tsx src/jobs/watchNow.ts",
+    "daily-digest": "tsx src/jobs/dailyDigest.ts",
+    "scheduler": "tsx src/jobs/scheduler.ts",
+    "dashboard": "npm run dev --prefix dashboard",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@google/genai": "^2.3.0",
+    "app-store-scraper": "^0.18.0",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "google-play-scraper": "^10.0.1",
+    "mongoose": "^8.9.5",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.16",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^6.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
