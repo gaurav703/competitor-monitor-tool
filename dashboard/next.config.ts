@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     "app-store-scraper",
     "nodemailer",
     "@google/genai",
+    "rss-parser",
   ],
   webpack: (config, { dev }) => {
     if (dev) {
