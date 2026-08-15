@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { runDailyDigest } from "../../../../../src/jobs/dailyDigest";
 import { runWatchNow } from "../../../../../src/jobs/watchNow";
@@ -50,25 +50,24 @@ async function runCron(request: Request): Promise<Response> {
   }
 
   const job = parseJob(request);
-  const startedAt = Date.now();
-  try {
-    await connectDb();
-    if (job === "watch" || job === "all") {
-      await runWatchNow();
+  after(async () => {
+    const startedAt = Date.now();
+    try {
+      await connectDb();
+      if (job === "watch" || job === "all") {
+        await runWatchNow();
+      }
+      if (job === "digest" || job === "all") {
+        await runDailyDigest();
+      }
+      console.log(`[cron] ${job} finished in ${Date.now() - startedAt}ms`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[cron] ${job} failed: ${message}`);
     }
-    if (job === "digest" || job === "all") {
-      await runDailyDigest();
-    }
-    return NextResponse.json({
-      ok: true,
-      job,
-      elapsedMs: Date.now() - startedAt,
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[cron] ${job} failed: ${message}`);
-    return NextResponse.json({ ok: false, job, error: message }, { status: 500 });
-  }
+  });
+
+  return NextResponse.json({ ok: true, accepted: true, job }, { status: 202 });
 }
 
 export async function GET(request: Request): Promise<Response> {
