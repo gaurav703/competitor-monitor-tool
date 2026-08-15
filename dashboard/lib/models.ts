@@ -19,6 +19,7 @@ const competitorSourceSchema = new Schema(
     type: { type: String, required: true, enum: SOURCE_TYPES },
     url: { type: String, required: true, trim: true },
     selector: { type: String, default: null },
+    enabled: { type: Boolean, default: true },
     lastCheckedHash: { type: String, default: null },
     lastCheckedAt: { type: Date, default: null },
     lastSeenItemKeys: { type: [String], default: undefined },
@@ -65,9 +66,20 @@ const changeLogSchema = new Schema(
   { timestamps: true }
 );
 
+const alertLogSchema = new Schema(
+  {
+    changeLogId: { type: Schema.Types.ObjectId, ref: "ChangeLog", required: true, index: true },
+    channel: { type: String, required: true, enum: ["email", "slack"] },
+    sentAt: { type: Date, required: true, default: Date.now },
+  },
+  { timestamps: true }
+);
+alertLogSchema.index({ changeLogId: 1, channel: 1 }, { unique: true });
+
 export type UserProductDoc = InferSchemaType<typeof userProductSchema> & { _id: Types.ObjectId };
 export type CompetitorDoc = InferSchemaType<typeof competitorSchema> & { _id: Types.ObjectId };
 export type ChangeLogDoc = InferSchemaType<typeof changeLogSchema> & { _id: Types.ObjectId };
+export type AlertLogDoc = InferSchemaType<typeof alertLogSchema> & { _id: Types.ObjectId };
 
 function registerModel<T>(name: string, schema: Schema): Model<T> {
   if (process.env.NODE_ENV !== "production" && models[name]) {
@@ -80,3 +92,4 @@ function registerModel<T>(name: string, schema: Schema): Model<T> {
 export const UserProductModel = registerModel<UserProductDoc>("UserProduct", userProductSchema);
 export const CompetitorModel = registerModel<CompetitorDoc>("Competitor", competitorSchema);
 export const ChangeLogModel = registerModel<ChangeLogDoc>("ChangeLog", changeLogSchema);
+export const AlertLogModel = registerModel<AlertLogDoc>("AlertLog", alertLogSchema);

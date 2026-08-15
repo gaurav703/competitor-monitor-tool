@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
-import { ChangeLogModel, CompetitorModel, UserProductModel } from "@/lib/models";
+import { AlertLogModel, ChangeLogModel, CompetitorModel, UserProductModel } from "@/lib/models";
 import { discoverSourcesForName } from "../../../../src/services/discoverSources";
 import {
   emailedUpdatesPayload,
@@ -160,3 +160,41 @@ export async function POST(request: Request) {
     { status }
   );
 }
+
+export async function PATCH(request: Request) {
+  await connectDb();
+  const body = (await request.json()) as { id?: string; name?: string };
+  const id = body.id?.trim();
+  const name = body.name?.trim();
+  if (!id || !name) {
+    return NextResponse.json({ error: "id and name are required." }, { status: 400 });
+  }
+  const updated = await CompetitorModel.findByIdAndUpdate(id, { $set: { name } }, { new: true });
+  if (!updated) {
+    return NextResponse.json({ error: "Competitor not found." }, { status: 404 });
+  }
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(request: Request) {
+  await connectDb();
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id")?.trim();
+  if (!id) {
+    return NextResponse.json({ error: "id is required." }, { status: 400 });
+  }
+  const competitor = await CompetitorModel.findById(id);
+  if (!competitor) {
+    return NextResponse.json({ error: "Competitor not found." }, { status: 404 });
+  }
+
+  const logs = await ChangeLogModel.find({ competitorId: id }).select("_id").lean();
+  const logIds = logs.map((row) => row._id);
+  await AlertLogModel.deleteMany({ changeLogId: { $in: logIds } });
+  await ChangeLogModel.deleteMany({ competitorId: id });
+  await CompetitorModel.findByIdAndDelete(id);
+
+  return NextResponse.json({ ok: true, deleted: { id, logs: logIds.length } });
+}
+
+export const dynamic = "force-dynamic";

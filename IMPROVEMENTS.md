@@ -34,23 +34,23 @@ The core loop works, but several watchers fire "changed" on content that is not 
 
 ## 2. Dashboard control — v1 is add-only
 
-### 2.1 Edit / delete competitors, sources, and products — `open`
+### 2.1 Edit / delete competitors, sources, and products — `done`
 
-- **Files:** `dashboard/app/CompetitorForm.tsx`, `dashboard/app/page.tsx`, `dashboard/app/api/competitors/route.ts`, `dashboard/app/api/products/route.ts`
+- **Files:** `dashboard/app/api/products/route.ts`, `dashboard/app/api/competitors/route.ts`, `dashboard/app/api/sources/route.ts`, `dashboard/app/ProductForm.tsx`, `dashboard/app/CompetitorControls.tsx`, `dashboard/app/SourceActions.tsx`, `dashboard/app/page.tsx`
 - **Problem:** competitors can be added but never removed, renamed, paused, or have sources toggled; products cannot be edited after creation.
-- **Fix:** add DELETE/PATCH endpoints and UI affordances; add a per-source enable/disable flag (model already has `sources[]`; add `enabled`).
+- **Fix (implemented):** `PATCH`/`DELETE` on products (cascades competitors + ChangeLogs + AlertLogs), competitors (rename + cascade delete), and sources (selector, `enabled` pause toggle, remove). UI: `ProductForm` gained Edit/Delete, `CompetitorControls` rename/delete, `SourceActions` pause/remove per source. The watcher skips disabled sources (`[SKIPPED]` in logs) via a new `enabled` flag on `Competitor.sources[]`. Dashboard model copy now also defines `AlertLog` (schema drift closed).
 
-### 2.2 Custom source URLs in the UI — `open`
+### 2.2 Custom source URLs in the UI — `done`
 
-- **Files:** `src/jobs/addCompetitor.ts`, `dashboard/app/CompetitorForm.tsx`, `dashboard/app/api/competitors/route.ts`, `src/services/discoverSources.ts`
+- **Files:** `dashboard/app/AddSource.tsx`, `dashboard/app/api/sources/route.ts`
 - **Problem:** the models fully support arbitrary `sources[{type,url}]`, but both CLI and UI only auto-discover by name. SaaS rivals without store listings or RSS cannot be watched from the UI.
-- **Fix:** allow adding a source by type + URL alongside name-based discovery.
+- **Fix (implemented):** `AddSource` form per competitor card (`+ Add source`) with type select + URL (+ optional CSS selector for `website`), backed by `POST /api/sources`. URLs are validated/normalized via the shared `normalizeHttpUrl` (now exported from `src/services/discoverSources.ts`), duplicates are rejected, and website sources can carry a selector at creation.
 
-### 2.3 "Run watch now" from the dashboard — `open`
+### 2.3 "Run watch now" from the dashboard — `done`
 
-- **Files:** `dashboard/app/page.tsx`, new API route
+- **Files:** `dashboard/app/WatchButton.tsx`, `dashboard/app/api/watch/route.ts`
 - **Problem:** users must SSH and run `npm run watch-now` to trigger a check; a founder-facing tool should have a button.
-- **Fix:** a POST endpoint that runs `runWatchForUserProduct` (guarded, maybe rate-limited) plus a button with result feedback.
+- **Fix (implemented):** `POST /api/watch` runs `runWatchForUserProduct(id, { analyze: true })` for the selected product and returns a summary (total / changed / analyzed / duplicates / errors / paused + per-source rows). `WatchButton` sits in the "Watching" header, shows progress, counts, and per-source errors. Note: `maxDuration = 120` — fine locally, on Vercel Hobby (60s cap) large products may time out (see 4.3).
 
 ### 2.4 Raw diff view — `open`
 

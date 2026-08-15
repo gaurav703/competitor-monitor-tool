@@ -11,6 +11,8 @@ const competitorSourceSchema = new Schema(
     // website sources only: scope the watcher to this CSS selector, so only
     // changes inside that section count as a diff (ignores nav, banners, etc.).
     selector: { type: String, default: null },
+    // false pauses the source: it is skipped during watch runs.
+    enabled: { type: Boolean, default: true },
     lastCheckedHash: { type: String, default: null },
     lastCheckedAt: { type: Date, default: null },
     // Feed sources (blog_rss, news) only: stable per-item keys seen so far.

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { connectDb } from "@/lib/db";
 import { ChangeLogModel, CompetitorModel, UserProductModel, type CompetitorDoc } from "@/lib/models";
+import { AddSource } from "./AddSource";
+import { CompetitorControls } from "./CompetitorControls";
 import { CompetitorForm } from "./CompetitorForm";
 import { EmailedUpdates } from "./EmailedUpdates";
 import { ProductForm } from "./ProductForm";
+import { SourceActions } from "./SourceActions";
 import { SourceSelector } from "./SourceSelector";
 import { Timeline, type TimelineItem } from "./Timeline";
+import { WatchButton } from "./WatchButton";
 
 export const dynamic = "force-dynamic";
 
@@ -101,28 +105,54 @@ export default async function HomePage({
 
       {selected && competitors.length > 0 ? (
         <section className="mb-10">
-          <h2 className="mb-4 font-serif text-2xl">Watching · {selected.name}</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-serif text-2xl">Watching · {selected.name}</h2>
+            <WatchButton userProductId={selected._id.toString()} />
+          </div>
           <ul className="space-y-3">
             {competitors.map((competitor) => (
               <li key={competitor._id.toString()} className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="font-medium">{competitor.name}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">{competitor.name}</p>
+                  <CompetitorControls
+                    competitorId={competitor._id.toString()}
+                    name={competitor.name}
+                  />
+                </div>
                 <ul className="mt-2 space-y-1 text-xs text-stone-600">
-                  {competitor.sources.map((source) => (
-                    <li key={`${source.type}-${source.url}`}>
-                      <span className="font-medium text-stone-800">{source.type}</span>{" "}
-                      <a href={source.url} className="underline" target="_blank" rel="noreferrer">
-                        {source.url}
-                      </a>
-                      {source.type === "website" && source._id ? (
-                        <SourceSelector
-                          competitorId={competitor._id.toString()}
-                          sourceId={source._id.toString()}
-                          initialSelector={source.selector ?? ""}
-                        />
-                      ) : null}
-                    </li>
-                  ))}
+                  {competitor.sources.map((source) => {
+                    const disabled = source.enabled === false;
+                    return (
+                      <li
+                        key={`${source.type}-${source.url}-${source._id?.toString() ?? ""}`}
+                        className={disabled ? "opacity-50" : undefined}
+                      >
+                        <span className="font-medium text-stone-800">{source.type}</span>{" "}
+                        <a href={source.url} className="underline" target="_blank" rel="noreferrer">
+                          {source.url}
+                        </a>
+                        {disabled ? <span className="ml-1 text-amber-700">(paused)</span> : null}
+                        {source._id ? (
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <SourceActions
+                              competitorId={competitor._id.toString()}
+                              sourceId={source._id.toString()}
+                              enabled={!disabled}
+                            />
+                            {source.type === "website" && !disabled ? (
+                              <SourceSelector
+                                competitorId={competitor._id.toString()}
+                                sourceId={source._id.toString()}
+                                initialSelector={source.selector ?? ""}
+                              />
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
+                <AddSource competitorId={competitor._id.toString()} />
                 <EmailedUpdates
                   updates={competitor.emailedUpdates ?? []}
                   emailSent={Boolean(competitor.lastUpdatesEmailSent)}

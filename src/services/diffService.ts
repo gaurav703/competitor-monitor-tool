@@ -44,6 +44,8 @@ export type DiffCheckResult = {
   isMeaningful: boolean | null;
   /** True when feed items were skipped because they duplicate a recent change. */
   deduped: boolean;
+  /** True when the source was skipped because it is disabled (paused). */
+  skipped: boolean;
 };
 
 function emptyAnalysisFields(): Pick<DiffCheckResult, "analyzed" | "changeLogId" | "isMeaningful"> {
@@ -313,6 +315,7 @@ export async function checkSource(params: {
       changeLogId,
       isMeaningful,
       deduped,
+      skipped: false,
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -327,6 +330,7 @@ export async function checkSource(params: {
       error: message,
       ...emptyAnalysisFields(),
       deduped: false,
+      skipped: false,
     };
   }
 }
@@ -369,6 +373,27 @@ export async function runWatchForUserProduct(
 
   for (const competitor of competitors) {
     for (const source of competitor.sources) {
+      if (source.enabled === false) {
+        results.push({
+          competitorId: competitor._id.toString(),
+          competitorName: competitor.name,
+          sourceId: source._id?.toString() ?? "",
+          sourceType: source.type as SourceType,
+          url: source.url,
+          watcher: source.type,
+          changed: false,
+          isFirstCheck: false,
+          previousHash: source.lastCheckedHash ?? null,
+          currentHash: null,
+          rawDiff: null,
+          error: null,
+          ...emptyAnalysisFields(),
+          deduped: false,
+          skipped: true,
+        });
+        continue;
+      }
+
       if (!source._id) {
         results.push({
           competitorId: competitor._id.toString(),
@@ -385,6 +410,7 @@ export async function runWatchForUserProduct(
           error: "Source is missing _id; cannot update hash.",
           ...emptyAnalysisFields(),
           deduped: false,
+          skipped: false,
         });
         continue;
       }

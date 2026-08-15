@@ -61,7 +61,7 @@ function originOf(url: string): string | null {
   }
 }
 
-function normalizeHttpUrl(raw: string): string | null {
+export function normalizeHttpUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) {
     return null;

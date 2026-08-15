@@ -18,6 +18,10 @@ export async function runWatchNow(): Promise<void> {
       console.log(`[BASELINE] ${row.competitorName} ${row.sourceType} hash saved, Gemini skipped`);
       continue;
     }
+    if (row.skipped) {
+      console.log(`[SKIPPED] ${row.competitorName} ${row.sourceType} source is disabled`);
+      continue;
+    }
     if (!row.changed) {
       console.log(`[UNCHANGED] ${row.competitorName} ${row.sourceType}`);
       continue;
