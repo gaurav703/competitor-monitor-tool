@@ -13,6 +13,9 @@ type AddResult = {
 };
 type Suggestion = { name: string; why: string };
 
+const inputClass =
+  "w-full rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 transition-colors duration-150 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10";
+
 export function CompetitorForm({ userProductId }: { userProductId: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +82,6 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
         return;
       }
       if (payload.error) {
-        // Refresh failed but the saved list is still shown.
         setSuggestError(payload.error);
       }
       setSuggestions(payload.suggestions ?? []);
@@ -150,108 +152,157 @@ export function CompetitorForm({ userProductId }: { userProductId: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="font-serif text-lg">Add competitors</h2>
-      <p className="text-sm text-stone-600">
-        Gemini suggests rivals for your product. Pick from the list, or type names yourself. We then look up Play
-        Store, App Store, website, and RSS.
+    <form onSubmit={onSubmit} className="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 className="font-serif text-lg tracking-tight">Add competitors</h2>
+      <p className="mt-0.5 text-sm text-stone-500">
+        Gemini suggests rivals for your product. Pick from the list, or type names yourself.
       </p>
 
-      <label className="block text-sm">
-        <span className="mb-1 flex items-center justify-between text-stone-700">
-          Suggested by Gemini
-          <button
-            type="button"
-            onClick={refreshSuggestions}
-            disabled={suggestStatus === "loading" || refreshing}
-            className="text-xs font-medium text-stone-500 hover:text-stone-900 disabled:opacity-50"
+      <div className="mt-4 space-y-3">
+        {/* Gemini suggestions */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-medium text-stone-600">Suggested by Gemini</span>
+            <button
+              type="button"
+              onClick={refreshSuggestions}
+              disabled={suggestStatus === "loading" || refreshing}
+              className="text-xs font-medium text-stone-400 transition-colors duration-150 hover:text-stone-700 disabled:opacity-50"
+            >
+              {refreshing ? (
+                <span className="inline-flex items-center gap-1">
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Refreshing…
+                </span>
+              ) : (
+                "↻ Refresh"
+              )}
+            </button>
+          </div>
+          <select
+            disabled={suggestStatus !== "ready" || suggestions.length === 0}
+            onChange={onPickFromDropdown}
+            defaultValue=""
+            className={inputClass}
           >
-            {refreshing ? "Refreshing…" : "↻ Refresh"}
-          </button>
-        </span>
-        <select
-          disabled={suggestStatus !== "ready" || suggestions.length === 0}
-          onChange={onPickFromDropdown}
-          defaultValue=""
-          className="w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        >
-          <option value="">
-            {suggestStatus === "loading"
-              ? "Asking Gemini…"
-              : refreshing
-                ? "Refreshing…"
-                : suggestions.length === 0
-                  ? "No suggestions"
-                  : "Select a competitor…"}
-          </option>
-          {suggestions.map((row) => (
-            <option key={row.name} value={row.name} title={row.why}>
-              {row.name}
+            <option value="">
+              {suggestStatus === "loading"
+                ? "Asking Gemini…"
+                : refreshing
+                  ? "Refreshing…"
+                  : suggestions.length === 0
+                    ? "No suggestions"
+                    : "Select a competitor…"}
             </option>
-          ))}
-        </select>
-      </label>
-      {suggestError ? <p className="text-xs text-red-700">{suggestError}</p> : null}
-      {suggestionsFromCache && !suggestError ? (
-        <p className="text-xs text-stone-400">Showing saved suggestions — hit Refresh for new picks.</p>
-      ) : null}
-      {picked.length > 0 ? (
-        <ul className="flex flex-wrap gap-2">
-          {picked.map((name) => (
-            <li key={name}>
+            {suggestions.map((row) => (
+              <option key={row.name} value={row.name} title={row.why}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {suggestError ? (
+          <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{suggestError}</div>
+        ) : null}
+        {suggestionsFromCache && !suggestError ? (
+          <p className="text-xs text-stone-400">Showing saved suggestions — hit Refresh for new picks.</p>
+        ) : null}
+
+        {/* Picked chips */}
+        {picked.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {picked.map((name) => (
               <button
+                key={name}
                 type="button"
                 onClick={() => removePicked(name)}
-                className="rounded-full bg-stone-900 px-3 py-1 text-xs text-white"
+                className="inline-flex items-center gap-1 rounded-full bg-stone-900 px-3 py-1 text-xs font-medium text-white transition-opacity duration-150 hover:opacity-80"
               >
-                {name} ×
+                {name}
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {suggestions.length > 0 ? (
-        <ul className="space-y-1 text-xs text-stone-500">
-          {suggestions.slice(0, 4).map((row) => (
-            <li key={`why-${row.name}`}>
-              <span className="font-medium text-stone-700">{row.name}:</span> {row.why}
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Why bullets */}
+        {suggestions.length > 0 ? (
+          <ul className="space-y-1 text-xs text-stone-500">
+            {suggestions.slice(0, 4).map((row) => (
+              <li key={`why-${row.name}`} className="flex gap-1.5">
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-stone-300" />
+                <span>
+                  <span className="font-medium text-stone-700">{row.name}:</span> {row.why}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {/* Manual input */}
+        <div>
+          <span className="mb-1.5 block text-xs font-medium text-stone-600">Or add manually</span>
+          <textarea
+            name="name"
+            rows={2}
+            placeholder="Zerodha, Groww, Dhan"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      {error ? (
+        <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <label className="block text-sm">
-        <span className="mb-1 block text-stone-700">Or add manually</span>
-        <textarea
-          name="name"
-          rows={2}
-          placeholder="Zerodha, Groww, Dhan"
-          className="w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        />
-      </label>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {/* Results */}
       {results.length > 0 ? (
-        <ul className="space-y-3 text-xs text-stone-600">
+        <div className="mt-3 space-y-2">
           {results.map((row) => (
-            <li key={row.name}>
-              <p className="font-medium text-stone-800">
+            <div
+              key={row.name}
+              className={`rounded-lg px-3 py-2 text-xs ${
+                row.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+              }`}
+            >
+              <p className="font-medium">
                 {row.name}{" "}
-                <span className={row.ok ? "text-emerald-700" : "text-red-700"}>
-                  {row.ok ? "added" : row.skipped ? "skipped" : "failed"}
+                <span className={row.ok ? "text-emerald-600" : "text-red-600"}>
+                  {row.ok ? "✓ added" : row.skipped ? "skipped" : "✗ failed"}
                 </span>
               </p>
-              {row.error ? <p className="text-red-700">{row.error}</p> : null}
+              {row.error ? <p className="mt-0.5">{row.error}</p> : null}
               {row.notes.map((note) => (
-                <p key={`${row.name}-${note.kind}-${note.detail}`}>
+                <p key={`${row.name}-${note.kind}-${note.detail}`} className="mt-0.5 opacity-80">
                   {note.kind}: {note.detail}
                 </p>
               ))}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       ) : null}
-      <button disabled={pending} className="rounded bg-stone-900 px-4 py-2 text-sm text-white disabled:opacity-50">
-        {pending ? "Discovering sources…" : "Add competitors"}
+
+      <button
+        disabled={pending}
+        className="mt-4 w-full rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-stone-800 active:bg-stone-950 disabled:opacity-50"
+      >
+        {pending ? (
+          <span className="inline-flex items-center gap-2">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Discovering sources…
+          </span>
+        ) : (
+          "Add competitors"
+        )}
       </button>
     </form>
   );

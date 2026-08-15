@@ -55,54 +55,63 @@ export function CompetitorControls({
     router.refresh();
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {editing ? (
-        <>
-          <input
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            className="w-48 rounded border border-stone-300 px-2 py-1 text-sm"
-          />
-          <button
-            type="button"
-            onClick={() => void rename()}
-            disabled={busy}
-            className="rounded border border-stone-300 px-2 py-1 text-xs text-stone-700 disabled:opacity-50"
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={() => {
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void rename();
+            if (event.key === "Escape") {
               setEditing(false);
               setValue(name);
-            }}
-            className="rounded border border-stone-300 px-2 py-1 text-xs text-stone-700"
-          >
-            Cancel
-          </button>
-        </>
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded border border-stone-300 px-2 py-1 text-xs text-stone-700"
-          >
-            Rename
-          </button>
-          <button
-            type="button"
-            onClick={() => void remove()}
-            disabled={busy}
-            className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
-          >
-            Delete
-          </button>
-        </>
-      )}
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+            }
+          }}
+          autoFocus
+          className="w-44 rounded-lg border border-stone-300 px-2.5 py-1 text-sm text-stone-900 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10"
+        />
+        <button
+          type="button"
+          onClick={() => void rename()}
+          disabled={busy}
+          className="rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-medium text-white transition-colors duration-150 hover:bg-stone-800 disabled:opacity-50"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(false);
+            setValue(name);
+          }}
+          className="rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-600 transition-colors duration-150 hover:bg-stone-50"
+        >
+          Cancel
+        </button>
+        {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-500 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800"
+      >
+        Rename
+      </button>
+      <button
+        type="button"
+        onClick={() => void remove()}
+        disabled={busy}
+        className="rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-500 transition-colors duration-150 hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+      >
+        Delete
+      </button>
+      {error ? <span className="text-xs text-red-600">{error}</span> : null}
     </div>
   );
 }

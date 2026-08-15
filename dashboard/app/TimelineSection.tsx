@@ -14,6 +14,12 @@ type Props = {
 
 const PAGE_SIZE = 50;
 
+const selectClass =
+  "rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-sm text-stone-700 transition-colors duration-150 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10";
+
+const inputClass =
+  "rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-sm text-stone-700 placeholder:text-stone-400 transition-colors duration-150 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10";
+
 export function TimelineSection({ userProductId, competitors, initialItems, initialTotal }: Props) {
   const [items, setItems] = useState<TimelineItem[]>(initialItems);
   const [total, setTotal] = useState(initialTotal);
@@ -27,6 +33,8 @@ export function TimelineSection({ userProductId, competitors, initialItems, init
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [includeNoise, setIncludeNoise] = useState(false);
+
+  const hasActiveFilters = Boolean(competitorId || urgency || area || dateFrom || dateTo || includeNoise);
 
   const fetchItems = useCallback(
     async (newOffset: number, replace: boolean) => {
@@ -60,100 +68,127 @@ export function TimelineSection({ userProductId, competitors, initialItems, init
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitorId, urgency, area, dateFrom, dateTo, includeNoise]);
 
+  function clearFilters() {
+    setCompetitorId("");
+    setUrgency("");
+    setArea("");
+    setDateFrom("");
+    setDateTo("");
+    setIncludeNoise(false);
+  }
+
   const hasMore = offset < total;
 
   return (
     <div>
       {/* Filter bar */}
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-stone-200 bg-white p-3">
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium text-stone-600">Competitor</span>
-          <select
-            value={competitorId}
-            onChange={(e) => setCompetitorId(e.target.value)}
-            className="rounded border border-stone-300 px-2 py-1 text-sm"
-          >
-            <option value="">All</option>
-            {competitors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="mb-4 rounded-xl border border-stone-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs font-medium text-stone-600">Filters</span>
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs font-medium text-stone-400 transition-colors duration-150 hover:text-stone-700"
+            >
+              Clear all
+            </button>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-stone-500">Competitor</span>
+            <select value={competitorId} onChange={(e) => setCompetitorId(e.target.value)} className={selectClass}>
+              <option value="">All</option>
+              {competitors.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium text-stone-600">Urgency</span>
-          <select
-            value={urgency}
-            onChange={(e) => setUrgency(e.target.value)}
-            className="rounded border border-stone-300 px-2 py-1 text-sm"
-          >
-            <option value="">All</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-stone-500">Urgency</span>
+            <select value={urgency} onChange={(e) => setUrgency(e.target.value)} className={selectClass}>
+              <option value="">All</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium text-stone-600">Area contains</span>
-          <input
-            type="text"
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            placeholder="e.g. pricing"
-            className="rounded border border-stone-300 px-2 py-1 text-sm"
-          />
-        </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-stone-500">Area</span>
+            <input
+              type="text"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="e.g. pricing"
+              className={`${inputClass} w-32`}
+            />
+          </label>
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium text-stone-600">From</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded border border-stone-300 px-2 py-1 text-sm"
-          />
-        </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-stone-500">From</span>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
+          </label>
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium text-stone-600">To</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="rounded border border-stone-300 px-2 py-1 text-sm"
-          />
-        </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-stone-500">To</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
+          </label>
 
-        <label className="flex items-center gap-1.5 text-xs">
-          <input
-            type="checkbox"
-            checked={includeNoise}
-            onChange={(e) => setIncludeNoise(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-stone-300"
-          />
-          <span className="text-stone-600">Include noise</span>
-        </label>
+          <label className="flex items-center gap-2 pb-0.5">
+            <input
+              type="checkbox"
+              checked={includeNoise}
+              onChange={(e) => setIncludeNoise(e.target.checked)}
+              className="h-4 w-4 rounded border-stone-300 text-stone-900 focus:ring-stone-900/10"
+            />
+            <span className="text-xs text-stone-600">Show noise</span>
+          </label>
+        </div>
       </div>
 
-      <p className="mb-3 text-xs text-stone-500">
-        {total} {total === 1 ? "entry" : "entries"}
-        {competitorId || urgency || area || dateFrom || dateTo ? " (filtered)" : ""}
-      </p>
+      {/* Count */}
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs text-stone-500">
+          {total} {total === 1 ? "entry" : "entries"}
+          {hasActiveFilters ? " (filtered)" : ""}
+        </p>
+        {loading ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-stone-400">
+            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading…
+          </span>
+        ) : null}
+      </div>
 
       <Timeline items={items} />
 
       {hasMore ? (
-        <div className="mt-4 text-center">
+        <div className="mt-6 text-center">
           <button
             type="button"
             disabled={loading}
             onClick={() => fetchItems(offset, false)}
-            className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-5 py-2.5 text-sm font-medium text-stone-600 transition-all duration-150 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-900 disabled:opacity-50"
           >
-            {loading ? "Loading…" : "Load more"}
+            {loading ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Loading…
+              </>
+            ) : (
+              "Load more"
+            )}
           </button>
         </div>
       ) : null}

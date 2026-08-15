@@ -51,12 +51,12 @@ export function SourceActions({
   }
 
   return (
-    <span className="mt-1 inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-1.5">
       <button
         type="button"
         onClick={() => void toggle()}
         disabled={busy}
-        className="rounded border border-stone-300 px-2 py-0.5 text-[11px] text-stone-700 disabled:opacity-50"
+        className="rounded-md border border-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-500 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800 disabled:opacity-50"
       >
         {enabled ? "Pause" : "Resume"}
       </button>
@@ -64,11 +64,11 @@ export function SourceActions({
         type="button"
         onClick={() => void remove()}
         disabled={busy}
-        className="rounded border border-red-200 px-2 py-0.5 text-[11px] text-red-700 disabled:opacity-50"
+        className="rounded-md border border-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-500 transition-colors duration-150 hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
       >
         Remove
       </button>
-      {error ? <span className="text-[11px] text-red-700">{error}</span> : null}
+      {error ? <span className="text-[11px] text-red-600">{error}</span> : null}
     </span>
   );
 }

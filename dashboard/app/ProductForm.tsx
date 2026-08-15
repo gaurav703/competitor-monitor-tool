@@ -11,6 +11,9 @@ export type ProductSummary = {
   ownerEmail: string;
 };
 
+const inputClass =
+  "w-full rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 transition-colors duration-150 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10";
+
 export function ProductForm({ product }: { product: ProductSummary | null }) {
   const router = useRouter();
   const [creating, setCreating] = useState(!product);
@@ -77,54 +80,51 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
 
   if (product && !creating && !editing) {
     return (
-      <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
+      <section className="rounded-xl border border-stone-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-serif text-lg">Your product</h2>
-            <p className="text-sm text-stone-600">Gemini uses this so analysis is about your product, not the market in general.</p>
+            <h2 className="font-serif text-lg tracking-tight">Your product</h2>
+            <p className="mt-0.5 text-sm text-stone-500">Gemini uses this so analysis is about your product, not the market.</p>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="flex shrink-0 gap-2">
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-700"
+              className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors duration-150 hover:bg-stone-50 hover:text-stone-900"
             >
               Edit
             </button>
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-700"
+              className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors duration-150 hover:bg-stone-50 hover:text-stone-900"
             >
-              Add new product
+              Add new
             </button>
             <button
               type="button"
               onClick={() => void remove()}
               disabled={pending}
-              className="rounded border border-red-200 px-3 py-1.5 text-sm text-red-700 disabled:opacity-50"
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors duration-150 hover:bg-red-50 disabled:opacity-50"
             >
               Delete
             </button>
           </div>
         </div>
-        <dl className="space-y-2 text-sm">
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Name</dt>
-            <dd className="font-medium">{product.name}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Industry</dt>
-            <dd>{product.industry}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Description</dt>
-            <dd className="whitespace-pre-wrap text-stone-800">{product.description}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Owner email</dt>
-            <dd>{product.ownerEmail}</dd>
-          </div>
+        <dl className="mt-4 space-y-3">
+          {[
+            { label: "Name", value: product.name },
+            { label: "Industry", value: product.industry },
+            { label: "Description", value: product.description, pre: true },
+            { label: "Owner email", value: product.ownerEmail },
+          ].map((field) => (
+            <div key={field.label}>
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">{field.label}</dt>
+              <dd className={`mt-0.5 text-sm ${field.pre ? "whitespace-pre-wrap text-stone-700" : "text-stone-900"}`}>
+                {field.value}
+              </dd>
+            </div>
+          ))}
         </dl>
       </section>
     );
@@ -135,14 +135,14 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
     <form
       key={isEdit ? `edit-${product?.id}` : "create"}
       onSubmit={onSubmit}
-      className="space-y-3 rounded-lg border border-stone-200 bg-white p-4"
+      className="rounded-xl border border-stone-200 bg-white p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-serif text-lg">
+          <h2 className="font-serif text-lg tracking-tight">
             {isEdit ? "Edit product" : product ? "Add new product" : "Your product"}
           </h2>
-          <p className="text-sm text-stone-600">Gemini uses this so analysis is about your product, not the market in general.</p>
+          <p className="mt-0.5 text-sm text-stone-500">Gemini uses this so analysis is about your product, not the market.</p>
         </div>
         {product ? (
           <button
@@ -152,45 +152,64 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
               setEditing(false);
               setError(null);
             }}
-            className="shrink-0 rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-700"
+            className="shrink-0 rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors duration-150 hover:bg-stone-50"
           >
             Cancel
           </button>
         ) : null}
       </div>
-      <input
-        name="name"
-        required
-        placeholder="Product name"
-        defaultValue={isEdit ? product?.name : undefined}
-        className="w-full rounded border border-stone-300 px-3 py-2 text-sm"
-      />
-      <input
-        name="industry"
-        required
-        placeholder="Industry (any)"
-        defaultValue={isEdit ? product?.industry : undefined}
-        className="w-full rounded border border-stone-300 px-3 py-2 text-sm"
-      />
-      <textarea
-        name="description"
-        required
-        placeholder="Short description"
-        defaultValue={isEdit ? product?.description : undefined}
-        className="w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        rows={3}
-      />
-      <input
-        name="ownerEmail"
-        type="email"
-        required
-        placeholder="Owner email (daily digest)"
-        defaultValue={isEdit ? product?.ownerEmail : undefined}
-        className="w-full rounded border border-stone-300 px-3 py-2 text-sm"
-      />
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
-      <button disabled={pending} className="rounded bg-stone-900 px-4 py-2 text-sm text-white disabled:opacity-50">
-        {pending ? "Saving…" : isEdit ? "Save changes" : "Save product"}
+      <div className="mt-4 space-y-3">
+        <input
+          name="name"
+          required
+          placeholder="Product name"
+          defaultValue={isEdit ? product?.name : undefined}
+          className={inputClass}
+        />
+        <input
+          name="industry"
+          required
+          placeholder="Industry (any)"
+          defaultValue={isEdit ? product?.industry : undefined}
+          className={inputClass}
+        />
+        <textarea
+          name="description"
+          required
+          placeholder="Short description of your product"
+          defaultValue={isEdit ? product?.description : undefined}
+          className={inputClass}
+          rows={3}
+        />
+        <input
+          name="ownerEmail"
+          type="email"
+          required
+          placeholder="Owner email (daily digest)"
+          defaultValue={isEdit ? product?.ownerEmail : undefined}
+          className={inputClass}
+        />
+      </div>
+      {error ? (
+        <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+      ) : null}
+      <button
+        disabled={pending}
+        className="mt-4 w-full rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-stone-800 active:bg-stone-950 disabled:opacity-50"
+      >
+        {pending ? (
+          <span className="inline-flex items-center gap-2">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Saving…
+          </span>
+        ) : isEdit ? (
+          "Save changes"
+        ) : (
+          "Save product"
+        )}
       </button>
     </form>
   );
