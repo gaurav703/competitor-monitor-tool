@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "crypto";
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { retryPendingAnalyses } from "../../../../../src/jobs/analyzePending";
 import { runDailyDigest } from "../../../../../src/jobs/dailyDigest";
@@ -51,25 +51,54 @@ async function runCron(request: Request): Promise<Response> {
   }
 
   const job = parseJob(request);
-  after(async () => {
-    const startedAt = Date.now();
-    try {
-      await connectDb();
-      if (job === "watch" || job === "all") {
-        await runWatchNow();
-        await retryPendingAnalyses();
-      }
-      if (job === "digest" || job === "all") {
-        await runDailyDigest();
-      }
-      console.log(`[cron] ${job} finished in ${Date.now() - startedAt}ms`);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[cron] ${job} failed: ${message}`);
-    }
-  });
+  const startedAt = Date.now();
 
-  return NextResponse.json({ ok: true, accepted: true, job }, { status: 202 });
+  try {
+    await connectDb();
+
+    const watch =
+      job === "watch" || job === "all" ? await runWatchNow() : null;
+    const pendingRetries =
+      job === "watch" || job === "all" ? await retryPendingAnalyses() : null;
+    const digest = job === "digest" || job === "all" ? await runDailyDigest() : null;
+
+    const emailSent = digest?.emailSent ?? false;
+    const emailAttempted = job === "digest" || job === "all";
+
+    return NextResponse.json({
+      ok: true,
+      job,
+      durationMs: Date.now() - startedAt,
+      email: {
+        attempted: emailAttempted,
+        sent: emailSent,
+        smtpConfigured: digest?.smtpConfigured ?? null,
+        reason: emailAttempted
+          ? emailSent
+            ? "sent"
+            : digest && digest.products.length === 0
+              ? "no_products"
+              : digest?.products.map((row) => row.reason).join(",") || "not_sent"
+          : "watch_job_does_not_send_email",
+        products: digest?.products ?? [],
+      },
+      watch,
+      pendingRetries,
+      digest,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[cron] ${job} failed: ${message}`);
+    return NextResponse.json(
+      {
+        ok: false,
+        job,
+        durationMs: Date.now() - startedAt,
+        error: message,
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET(request: Request): Promise<Response> {

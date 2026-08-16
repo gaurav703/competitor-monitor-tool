@@ -48,7 +48,7 @@ Create two GET jobs. Use the same `CRON_SECRET` as in Vercel environment variabl
 | `competitor-watch` | Fetch sources, hash, Gemini on real diffs | `https://YOUR_DOMAIN/api/cron/run?job=watch&secret=CRON_SECRET` | `0 */12 * * *` (every 12 hours) |
 | `competitor-digest` | Email meaningful changes to `ownerEmail` | `https://YOUR_DOMAIN/api/cron/run?job=digest&secret=CRON_SECRET` | `0 8 * * *` (daily; set timezone, e.g. Asia/Kolkata) |
 
-The endpoint returns **202** immediately so cron-job.org’s ~30s free timeout does not mark the job failed. The pipeline can keep running on Vercel for up to 5 minutes. Check **Vercel → Logs** for `[UNCHANGED]`, `[BASELINE]`, `[ANALYZED]`, and `[cron] watch finished`.
+The endpoint waits for the pipeline and returns **200** with a JSON body: what each source fetched (`watch.sources`: unchanged / baseline / analyzed / error), Gemini pending retries, and whether digest email was sent (`email.sent`, plus per-product reasons like `no_changes`, `already_emailed`, or `smtp_not_configured`). Raise cron-job.org’s request timeout if a watch run can exceed ~30s (Vercel can run up to 5 minutes). Check **Vercel → Logs** for `[UNCHANGED]`, `[BASELINE]`, `[ANALYZED]`, and digest lines.
 
 Do not schedule watch every 15 minutes — that burns Gemini quota and store rate limits.
 

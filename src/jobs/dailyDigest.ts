@@ -1,8 +1,9 @@
 import { connectDb, disconnectDb } from "../config/db";
 import { sendDigestsForAllProducts } from "../services/notificationService";
+import type { DigestRunSummary } from "../services/notificationService";
 
-export async function runDailyDigest(): Promise<void> {
-  await sendDigestsForAllProducts();
+export async function runDailyDigest(): Promise<DigestRunSummary> {
+  return sendDigestsForAllProducts();
 }
 
 async function main(): Promise<void> {

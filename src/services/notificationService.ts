@@ -59,9 +59,9 @@ function buildHtml(productName: string, grouped: Map<string, DigestChange[]>): s
 export async function sendEmailDigest(
   changeLogs: DigestChange[],
   userProduct: Pick<UserProduct, "name" | "ownerEmail">
-): Promise<{ sent: boolean; skipped: string[]; emailed: string[] }> {
+): Promise<{ sent: boolean; reason: DigestSkipReason; skipped: string[]; emailed: string[] }> {
   if (changeLogs.length === 0) {
-    return { sent: false, skipped: [], emailed: [] };
+    return { sent: false, reason: "no_changes", skipped: [], emailed: [] };
   }
 
   const ids = changeLogs.map((item) => item._id);
@@ -78,14 +78,14 @@ export async function sendEmailDigest(
 
   if (fresh.length === 0) {
     console.log(`Nothing new to email for ${userProduct.name} (all already in AlertLog).`);
-    return { sent: false, skipped, emailed: [] };
+    return { sent: false, reason: "already_emailed", skipped, emailed: [] };
   }
 
   if (!isSmtpConfigured()) {
     console.warn(
       "SMTP is not configured (need SMTP_HOST and EMAIL_FROM). Skipping send; no AlertLog written."
     );
-    return { sent: false, skipped, emailed: [] };
+    return { sent: false, reason: "smtp_not_configured", skipped, emailed: [] };
   }
 
   const grouped = new Map<string, DigestChange[]>();
@@ -117,12 +117,31 @@ export async function sendEmailDigest(
     }
   }
 
-  return { sent: true, skipped, emailed };
+  return { sent: true, reason: "sent", skipped, emailed };
 }
 
-export async function sendDigestsForAllProducts(): Promise<void> {
+export type DigestSkipReason = "no_changes" | "already_emailed" | "smtp_not_configured" | "sent";
+
+export type DigestProductResult = {
+  productName: string;
+  ownerEmail: string;
+  meaningfulChanges: number;
+  emailSent: boolean;
+  reason: DigestSkipReason;
+  emailedCount: number;
+  skippedAlreadyEmailed: number;
+};
+
+export type DigestRunSummary = {
+  smtpConfigured: boolean;
+  emailSent: boolean;
+  products: DigestProductResult[];
+};
+
+export async function sendDigestsForAllProducts(): Promise<DigestRunSummary> {
   const products = await UserProductModel.find().lean();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const details: DigestProductResult[] = [];
 
   for (const product of products) {
     const competitors = await CompetitorModel.find({ userProductId: product._id }).lean();
@@ -163,6 +182,21 @@ export async function sendDigestsForAllProducts(): Promise<void> {
     console.log(
       `Digest for ${product.name} <${product.ownerEmail}>: ${digestItems.length} meaningful change(s) in last 24h`
     );
-    await sendEmailDigest(digestItems, product);
+    const result = await sendEmailDigest(digestItems, product);
+    details.push({
+      productName: product.name,
+      ownerEmail: product.ownerEmail,
+      meaningfulChanges: digestItems.length,
+      emailSent: result.sent,
+      reason: result.reason,
+      emailedCount: result.emailed.length,
+      skippedAlreadyEmailed: result.skipped.length,
+    });
   }
+
+  return {
+    smtpConfigured: isSmtpConfigured(),
+    emailSent: details.some((row) => row.emailSent),
+    products: details,
+  };
 }

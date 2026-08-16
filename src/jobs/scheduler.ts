@@ -12,18 +12,21 @@ export type HandlerEvent = {
  * AWS Lambda-compatible one-shot handler.
  * EventBridge can pass `{ "job": "watch" | "digest" | "all" }`.
  */
-export async function handler(event: HandlerEvent = {}): Promise<{ ok: true; job: string }> {
+export async function handler(event: HandlerEvent = {}): Promise<{
+  ok: true;
+  job: string;
+  watch: Awaited<ReturnType<typeof runWatchNow>> | null;
+  pendingRetries: Awaited<ReturnType<typeof retryPendingAnalyses>> | null;
+  digest: Awaited<ReturnType<typeof runDailyDigest>> | null;
+}> {
   const job = event.job ?? "all";
   await connectDb();
   try {
-    if (job === "watch" || job === "all") {
-      await runWatchNow();
-      await retryPendingAnalyses();
-    }
-    if (job === "digest" || job === "all") {
-      await runDailyDigest();
-    }
-    return { ok: true, job };
+    const watch = job === "watch" || job === "all" ? await runWatchNow() : null;
+    const pendingRetries =
+      job === "watch" || job === "all" ? await retryPendingAnalyses() : null;
+    const digest = job === "digest" || job === "all" ? await runDailyDigest() : null;
+    return { ok: true, job, watch, pendingRetries, digest };
   } finally {
     await disconnectDb();
   }
