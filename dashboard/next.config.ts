@@ -33,6 +33,12 @@ const nextConfig: NextConfig = {
     externalDir: true,
   },
   serverExternalPackages: serverPackages,
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/google-play-scraper/**/*",
+      "../node_modules/google-play-scraper/**/*",
+    ],
+  },
   webpack: (config, { dev, isServer }) => {
     const dashboardModules = path.resolve(__dirname, "node_modules");
     const rootModules = path.resolve(repoRoot, "node_modules");

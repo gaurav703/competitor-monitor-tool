@@ -101,21 +101,40 @@ export function WatchButton({ userProductId }: { userProductId: string }) {
             ))}
           </div>
 
-          {/* Errors */}
+          {/* Errors grouped by message so the same Play Store / Reddit failure is not listed 3 times */}
           {summary.rows.some((row) => row.error) ? (
-            <div className="mt-3 space-y-1">
-              {summary.rows
-                .filter((row) => row.error)
-                .map((row) => (
-                  <div key={`${row.competitorName}-${row.sourceType}`} className="flex items-start gap-2 text-xs text-red-600">
-                    <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                    </svg>
-                    <span>
-                      <span className="font-medium">{row.competitorName}</span> · {row.sourceType}: {row.error}
+            <div className="mt-3 space-y-2">
+              {Object.values(
+                summary.rows.reduce<Record<string, { error: string; sourceType: string; names: string[] }>>(
+                  (groups, row) => {
+                    if (!row.error) {
+                      return groups;
+                    }
+                    const key = `${row.sourceType}::${row.error}`;
+                    if (!groups[key]) {
+                      groups[key] = { error: row.error, sourceType: row.sourceType, names: [] };
+                    }
+                    groups[key].names.push(row.competitorName);
+                    return groups;
+                  },
+                  {},
+                ),
+              ).map((group) => (
+                <div key={`${group.sourceType}-${group.error}`} className="flex items-start gap-2 text-xs text-red-600">
+                  <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  <span>
+                    <span className="font-medium">
+                      {group.sourceType}
+                      {group.names.length > 1 ? ` · ${group.names.length}` : ""}
                     </span>
-                  </div>
-                ))}
+                    {": "}
+                    {group.error}
+                    <span className="block text-red-500/80">{group.names.join(", ")}</span>
+                  </span>
+                </div>
+              ))}
             </div>
           ) : null}
 
