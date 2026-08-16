@@ -32,8 +32,28 @@ function dateMs(value: string): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-export async function fetchBlogRss(url: string): Promise<WatchedContent> {
-  const feed = await parser.parseURL(url);
+type ParsedRssItem = {
+  guid?: string;
+  link?: string;
+  title?: string;
+  isoDate?: string;
+  pubDate?: string;
+  contentSnippet?: string;
+  content?: string;
+};
+
+type ParsedRss = {
+  title?: string;
+  link?: string;
+  items?: ParsedRssItem[];
+};
+
+export function watchedFromParsedRss(
+  feed: ParsedRss,
+  url: string,
+  sourceType: SourceType,
+  watcher: string
+): WatchedContent {
   const items = (feed.items ?? []).slice(0, MAX_ITEMS);
 
   const seen = new Set<string>();
@@ -70,12 +90,12 @@ export async function fetchBlogRss(url: string): Promise<WatchedContent> {
   const latest = [...sorted].sort((a, b) => dateMs(b.date) - dateMs(a.date))[0];
 
   return {
-    sourceType: "blog_rss" as SourceType,
+    sourceType,
     url,
     canonicalText,
     itemKeys: sorted.map((item) => item.key),
     meta: {
-      watcher: "blogRssWatcher",
+      watcher,
       feedTitle: feed.title,
       feedLink: feed.link,
       itemCount: sorted.length,
@@ -84,4 +104,19 @@ export async function fetchBlogRss(url: string): Promise<WatchedContent> {
       items: sorted,
     },
   };
+}
+
+export async function watchedFromRssXml(
+  xml: string,
+  url: string,
+  sourceType: SourceType,
+  watcher: string
+): Promise<WatchedContent> {
+  const feed = await parser.parseString(xml);
+  return watchedFromParsedRss(feed, url, sourceType, watcher);
+}
+
+export async function fetchBlogRss(url: string): Promise<WatchedContent> {
+  const feed = await parser.parseURL(url);
+  return watchedFromParsedRss(feed, url, "blog_rss", "blogRssWatcher");
 }

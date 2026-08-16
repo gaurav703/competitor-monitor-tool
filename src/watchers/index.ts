@@ -3,6 +3,7 @@ import { fetchAppStore } from "./appStoreWatcher";
 import { fetchBlogRss } from "./blogRssWatcher";
 import { fetchNews } from "./newsWatcher";
 import { fetchPlayStore } from "./playStoreWatcher";
+import { fetchReddit } from "./redditWatcher";
 import type { WatchedContent } from "./types";
 import { fetchWebsite } from "./websiteWatcher";
 
@@ -16,6 +17,8 @@ export async function fetchSource(type: SourceType, url: string, selector?: stri
       return fetchBlogRss(url);
     case "news":
       return fetchNews(url);
+    case "reddit":
+      return fetchReddit(url);
     case "website":
       return fetchWebsite(url, selector);
     default: {
@@ -29,4 +32,5 @@ export { fetchAppStore } from "./appStoreWatcher";
 export { fetchBlogRss } from "./blogRssWatcher";
 export { fetchPlayStore } from "./playStoreWatcher";
 export { fetchNews, googleNewsRssUrl } from "./newsWatcher";
+export { fetchReddit, redditSearchRssUrl } from "./redditWatcher";
 export type { WatchedContent } from "./types";

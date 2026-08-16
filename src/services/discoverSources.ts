@@ -1,8 +1,9 @@
 import * as cheerio from "cheerio";
 import { googleNewsRssUrl } from "../watchers/newsWatcher";
+import { redditSearchRssUrl } from "../watchers/redditWatcher";
 import { importEsm } from "../watchers/importEsm";
 
-type SourceType = "playstore" | "appstore" | "blog_rss" | "website" | "news";
+type SourceType = "playstore" | "appstore" | "blog_rss" | "website" | "news" | "reddit";
 
 export type DiscoveredSource = {
   type: SourceType;
@@ -10,7 +11,7 @@ export type DiscoveredSource = {
 };
 
 export type DiscoveryNote = {
-  kind: "playstore" | "appstore" | "website" | "blog_rss" | "news";
+  kind: "playstore" | "appstore" | "website" | "blog_rss" | "news" | "reddit";
   detail: string;
 };
 
@@ -396,6 +397,10 @@ export async function discoverSourcesForName(name: string): Promise<DiscoveryRes
   const newsUrl = googleNewsRssUrl(name);
   add("news", newsUrl);
   notes.push({ kind: "news", detail: `Google News RSS for "${name}"` });
+
+  const redditUrl = redditSearchRssUrl(name);
+  add("reddit", redditUrl);
+  notes.push({ kind: "reddit", detail: `Reddit search RSS for "${name}"` });
 
   return { sources, notes };
 }

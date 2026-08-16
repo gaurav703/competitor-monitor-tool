@@ -109,6 +109,7 @@ Respond with JSON only, using this shape:
 Rules:
 - isMeaningful is true only for a real product, feature, pricing, positioning, go-to-market change, or a news/blog article that reports such a change.
 - For source type "news", treat new headlines about funding, launches, regulation, or product moves as potentially meaningful; ignore generic market roundups that only mention the name in passing.
+- For source type "reddit", treat launch threads, feature complaints, pricing talk, and clusters of "app is broken" / quality issues as potentially meaningful; ignore memes, name collisions, and generic "anyone use X?" posts with no product signal.
 - isMeaningful is false for noise: typo fixes, generic "bug fixes and improvements", minor copy edits, cookie banners, nav tweaks, or unchanged marketing fluff.
 - If meaningful, aiSummary must be 2-3 sentences about why this matters to the founder of ${userProduct.name}.
 - relevantArea is a short free-text label inferred from context (examples: pricing, onboarding, core feature, integrations, mobile UX) — not a fixed enum.

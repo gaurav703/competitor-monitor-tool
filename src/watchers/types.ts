@@ -7,7 +7,7 @@ export type WatchedContent = {
   canonicalText: string;
   meta: Record<string, unknown>;
   /**
-   * Stable per-item identities, present for feed sources (blog_rss, news).
+   * Stable per-item identities, present for feed sources (blog_rss, news, reddit).
    * Diffing hashes this *set* so that reordering or headline rotation never
    * looks like a change — only genuinely new items do.
    */

@@ -6,6 +6,7 @@ import { fetchSource } from "../watchers";
 import type { WatchedContent } from "../watchers";
 import type { FeedItem } from "../watchers/blogRssWatcher";
 import { googleNewsRssUrl } from "../watchers/newsWatcher";
+import { redditSearchRssUrl } from "../watchers/redditWatcher";
 import { AnalysisError } from "./geminiClient";
 import { analyzeChange } from "./aiAnalysisService";
 import type { ChangeAnalysis, UserProductContext } from "./aiAnalysisService";
@@ -401,6 +402,15 @@ export async function runWatchForUserProduct(
       });
       await competitor.save();
       console.log(`Added Google News source for ${competitor.name}`);
+    }
+    const hasReddit = competitor.sources.some((source) => source.type === "reddit");
+    if (!hasReddit) {
+      competitor.sources.push({
+        type: "reddit",
+        url: redditSearchRssUrl(competitor.name),
+      });
+      await competitor.save();
+      console.log(`Added Reddit search source for ${competitor.name}`);
     }
   }
 

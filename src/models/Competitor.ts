@@ -1,7 +1,7 @@
 import { Schema, type InferSchemaType, type Types } from "mongoose";
 import { registerModel } from "./registerModel";
 
-export const SOURCE_TYPES = ["playstore", "appstore", "blog_rss", "website", "news"] as const;
+export const SOURCE_TYPES = ["playstore", "appstore", "blog_rss", "website", "news", "reddit"] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 
 const competitorSourceSchema = new Schema(
@@ -15,7 +15,7 @@ const competitorSourceSchema = new Schema(
     enabled: { type: Boolean, default: true },
     lastCheckedHash: { type: String, default: null },
     lastCheckedAt: { type: Date, default: null },
-    // Feed sources (blog_rss, news) only: stable per-item keys seen so far.
+    // Feed sources (blog_rss, news, reddit) only: stable per-item keys seen so far.
     // Change detection hashes this set so feed reshuffles never trigger a diff.
     lastSeenItemKeys: { type: [String], default: undefined },
   },

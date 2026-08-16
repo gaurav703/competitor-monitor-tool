@@ -54,7 +54,7 @@ export async function liveStorePreviewsForCompetitor(
   needed: number
 ): Promise<PreviewUpdate[]> {
   const previews: PreviewUpdate[] = [];
-  const preferred: SourceType[] = ["news", "playstore", "appstore", "blog_rss"];
+  const preferred: SourceType[] = ["news", "reddit", "playstore", "appstore", "blog_rss"];
   const sources = [...competitor.sources].sort((a, b) => {
     const ai = preferred.indexOf(a.type as SourceType);
     const bi = preferred.indexOf(b.type as SourceType);

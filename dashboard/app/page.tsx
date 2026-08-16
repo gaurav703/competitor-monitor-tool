@@ -19,6 +19,7 @@ const SOURCE_LABELS: Record<string, string> = {
   blog_rss: "RSS",
   website: "Website",
   news: "News",
+  reddit: "Reddit",
 };
 
 function sourceTypeBadge(type: string): string {
@@ -32,6 +33,8 @@ function sourceTypeBadge(type: string): string {
       return `${base} bg-orange-50 text-orange-700 ring-1 ring-orange-600/20`;
     case "news":
       return `${base} bg-violet-50 text-violet-700 ring-1 ring-violet-600/20`;
+    case "reddit":
+      return `${base} bg-rose-50 text-rose-700 ring-1 ring-rose-600/20`;
     default:
       return `${base} bg-stone-100 text-stone-600 ring-1 ring-stone-500/20`;
   }
