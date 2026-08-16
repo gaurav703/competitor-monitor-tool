@@ -61,7 +61,6 @@ export default async function HomePage({
     sourceType: string;
     sourceUrl: string | null;
     isMeaningful: boolean;
-    rawDiffContent: string | null;
   }[] = [];
   let initialTotal = 0;
   let competitors: CompetitorDoc[] = [];
@@ -98,7 +97,6 @@ export default async function HomePage({
         sourceType: log.sourceType,
         sourceUrl: raw?.url ?? null,
         isMeaningful: log.isMeaningful,
-        rawDiffContent: raw?.content ?? null,
       };
     });
   }

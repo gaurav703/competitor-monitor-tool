@@ -85,7 +85,6 @@ export async function GET(request: Request) {
       urgency: log.urgency,
       aiSummary: log.aiSummary,
       isMeaningful: log.isMeaningful,
-      rawDiffContent: raw?.content ?? null,
     };
   });
 

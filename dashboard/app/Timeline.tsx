@@ -1,7 +1,3 @@
-"use client";
-
-import { useState } from "react";
-
 function urgencyPill(urgency: string | null): string {
   const base = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
   if (urgency === "high") return `${base} bg-red-50 text-red-700 ring-1 ring-red-600/20`;
@@ -19,41 +15,7 @@ export type TimelineItem = {
   sourceType: string;
   sourceUrl: string | null;
   isMeaningful: boolean;
-  rawDiffContent: string | null;
 };
-
-function DiffToggle({ content }: { content: string }) {
-  const [open, setOpen] = useState(false);
-  const preview = content.length > 140 ? content.slice(0, 140) + "…" : content;
-
-  return (
-    <div className="mt-2.5">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-stone-500 transition-colors duration-150 hover:bg-stone-100 hover:text-stone-800"
-      >
-        <svg
-          className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-        </svg>
-        {open ? "Hide diff" : "Show diff"}
-      </button>
-      {!open ? (
-        <p className="mt-1 pl-7 text-xs leading-relaxed text-stone-400">{preview}</p>
-      ) : (
-        <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-stone-200 bg-stone-50 p-4 text-xs leading-relaxed text-stone-700 whitespace-pre-wrap">
-          {content}
-        </pre>
-      )}
-    </div>
-  );
-}
 
 export function Timeline({ items }: { items: TimelineItem[] }) {
   const grouped = new Map<string, TimelineItem[]>();
@@ -111,7 +73,6 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
                   <span className="text-[11px] text-stone-400">{item.sourceType}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-stone-800">{item.aiSummary ?? "No summary available."}</p>
-                {item.rawDiffContent ? <DiffToggle content={item.rawDiffContent} /> : null}
                 {item.sourceUrl ? (
                   <a
                     href={item.sourceUrl}
