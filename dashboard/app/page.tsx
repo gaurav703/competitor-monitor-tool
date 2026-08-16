@@ -43,13 +43,17 @@ function sourceTypeBadge(type: string): string {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ userProductId?: string }>;
+  searchParams: Promise<{ userProductId?: string; new?: string }>;
 }) {
   await connectDb();
   const params = await searchParams;
   const products = await UserProductModel.find().sort({ createdAt: -1 }).lean();
-  const selectedId = params.userProductId ?? products[0]?._id.toString();
-  const selected = products.find((product) => product._id.toString() === selectedId) ?? products[0];
+  const creating = params.new === "1" || products.length === 0;
+  const fallbackId = params.userProductId ?? products[0]?._id.toString();
+  const selected = creating
+    ? undefined
+    : products.find((product) => product._id.toString() === fallbackId) ?? products[0];
+  const cancelHref = fallbackId ? `/?userProductId=${fallbackId}` : "/";
 
   let initialItems: {
     id: string;
@@ -122,30 +126,38 @@ export default async function HomePage({
       </header>
 
       {/* Product tabs */}
-      {products.length > 0 ? (
-        <nav className="mb-8 flex flex-wrap gap-2">
-          {products.map((product) => {
-            const id = product._id.toString();
-            const active = selected?._id.toString() === id;
-            return (
-              <Link
-                key={id}
-                href={`/?userProductId=${id}`}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ${
-                  active
-                    ? "bg-stone-900 text-white shadow-sm"
-                    : "bg-white text-stone-600 ring-1 ring-stone-200 hover:ring-stone-300 hover:text-stone-900"
-                }`}
-              >
-                {product.name}
-              </Link>
-            );
-          })}
-        </nav>
-      ) : null}
+      <nav className="mb-8 flex flex-wrap gap-2">
+        {products.map((product) => {
+          const id = product._id.toString();
+          const active = selected?._id.toString() === id;
+          return (
+            <Link
+              key={id}
+              href={`/?userProductId=${id}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ${
+                active
+                  ? "bg-stone-900 text-white shadow-sm"
+                  : "bg-white text-stone-600 ring-1 ring-stone-200 hover:ring-stone-300 hover:text-stone-900"
+              }`}
+            >
+              {product.name}
+            </Link>
+          );
+        })}
+        <Link
+          href={fallbackId ? `/?new=1&userProductId=${fallbackId}` : "/?new=1"}
+          className={`rounded-full border border-dashed px-4 py-1.5 text-sm font-medium transition-all duration-150 ${
+            creating
+              ? "border-stone-900 bg-white text-stone-900"
+              : "border-stone-300 bg-transparent text-stone-500 hover:border-stone-400 hover:text-stone-800"
+          }`}
+        >
+          + Add product
+        </Link>
+      </nav>
 
       {/* Stats bar */}
-      {selected && competitors.length > 0 ? (
+      {selected ? (
         <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: "Competitors", value: competitors.length },
@@ -170,6 +182,7 @@ export default async function HomePage({
       <div className="mb-12 grid gap-4 lg:grid-cols-2">
         <ProductForm
           key={selected?._id.toString() ?? "new"}
+          cancelHref={cancelHref}
           product={
             selected
               ? {
@@ -182,7 +195,7 @@ export default async function HomePage({
               : null
           }
         />
-        {selected ? (
+        {selected && !creating ? (
           <CompetitorForm userProductId={selected._id.toString()} />
         ) : (
           <div className="flex items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white/50 p-8">

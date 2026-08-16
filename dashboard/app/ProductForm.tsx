@@ -14,9 +14,14 @@ export type ProductSummary = {
 const inputClass =
   "w-full rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 transition-colors duration-150 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10";
 
-export function ProductForm({ product }: { product: ProductSummary | null }) {
+export function ProductForm({
+  product,
+  cancelHref,
+}: {
+  product: ProductSummary | null;
+  cancelHref: string;
+}) {
   const router = useRouter();
-  const [creating, setCreating] = useState(!product);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -52,7 +57,6 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
     }
     const saved = (await response.json()) as { _id: string };
     form.reset();
-    setCreating(false);
     router.push(`/?userProductId=${saved._id}`);
     router.refresh();
   }
@@ -78,7 +82,7 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
     router.refresh();
   }
 
-  if (product && !creating && !editing) {
+  if (product && !editing) {
     return (
       <section className="rounded-xl border border-stone-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
@@ -86,7 +90,7 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
             <h2 className="font-serif text-lg tracking-tight">Your product</h2>
             <p className="mt-0.5 text-sm text-stone-500">Gemini uses this so analysis is about your product, not the market.</p>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 items-center gap-3">
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -96,16 +100,9 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
             </button>
             <button
               type="button"
-              onClick={() => setCreating(true)}
-              className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors duration-150 hover:bg-stone-50 hover:text-stone-900"
-            >
-              Add new
-            </button>
-            <button
-              type="button"
               onClick={() => void remove()}
               disabled={pending}
-              className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors duration-150 hover:bg-red-50 disabled:opacity-50"
+              className="text-sm text-red-600/80 transition-colors duration-150 hover:text-red-700 disabled:opacity-50"
             >
               Delete
             </button>
@@ -140,17 +137,20 @@ export function ProductForm({ product }: { product: ProductSummary | null }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-serif text-lg tracking-tight">
-            {isEdit ? "Edit product" : product ? "Add new product" : "Your product"}
+            {isEdit ? "Edit product" : "Add product"}
           </h2>
           <p className="mt-0.5 text-sm text-stone-500">Gemini uses this so analysis is about your product, not the market.</p>
         </div>
-        {product ? (
+        {isEdit || cancelHref !== "/" ? (
           <button
             type="button"
             onClick={() => {
-              setCreating(false);
-              setEditing(false);
-              setError(null);
+              if (isEdit) {
+                setEditing(false);
+                setError(null);
+                return;
+              }
+              router.push(cancelHref);
             }}
             className="shrink-0 rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors duration-150 hover:bg-stone-50"
           >
