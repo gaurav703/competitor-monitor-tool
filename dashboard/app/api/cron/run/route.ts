@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { retryPendingAnalyses } from "../../../../../src/jobs/analyzePending";
 import { runDailyDigest } from "../../../../../src/jobs/dailyDigest";
@@ -45,66 +45,48 @@ function parseJob(request: Request): CronJob {
   return "all";
 }
 
-async function runCron(request: Request): Promise<Response> {
+async function runCronWork(job: CronJob): Promise<void> {
+  const startedAt = Date.now();
+  await connectDb();
+
+  const watch =
+    job === "watch" || job === "all"
+      ? await runWatchNow({ deferAnalysis: true, fetchConcurrency: 4 })
+      : null;
+  const pendingRetries =
+    job === "watch" || job === "digest" || job === "all"
+      ? await retryPendingAnalyses()
+      : null;
+  const digest = job === "digest" || job === "all" ? await runDailyDigest() : null;
+
+  console.log(
+    `[cron] ${job} finished in ${Date.now() - startedAt}ms watch=${watch ? watch.changed + " changed" : "skipped"} pendingRetries=${pendingRetries?.retried ?? 0} digest=${digest ? (digest.emailSent ? "sent" : "not_sent") : "skipped"}`
+  );
+}
+
+function acceptCron(request: Request): Response {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const job = parseJob(request);
-  const startedAt = Date.now();
+  console.log(`[cron] ${job} accepted`);
+  after(async () => {
+    try {
+      await runCronWork(job);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[cron] ${job} failed: ${message}`);
+    }
+  });
 
-  try {
-    await connectDb();
-
-    const watch =
-      job === "watch" || job === "all" ? await runWatchNow() : null;
-    const pendingRetries =
-      job === "watch" || job === "all" ? await retryPendingAnalyses() : null;
-    const digest = job === "digest" || job === "all" ? await runDailyDigest() : null;
-
-    const emailSent = digest?.emailSent ?? false;
-    const emailAttempted = job === "digest" || job === "all";
-
-    return NextResponse.json({
-      ok: true,
-      job,
-      durationMs: Date.now() - startedAt,
-      email: {
-        attempted: emailAttempted,
-        sent: emailSent,
-        smtpConfigured: digest?.smtpConfigured ?? null,
-        reason: emailAttempted
-          ? emailSent
-            ? "sent"
-            : digest && digest.products.length === 0
-              ? "no_products"
-              : digest?.products.map((row) => row.reason).join(",") || "not_sent"
-          : "watch_job_does_not_send_email",
-        products: digest?.products ?? [],
-      },
-      watch,
-      pendingRetries,
-      digest,
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[cron] ${job} failed: ${message}`);
-    return NextResponse.json(
-      {
-        ok: false,
-        job,
-        durationMs: Date.now() - startedAt,
-        error: message,
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ ok: true, accepted: true, job }, { status: 202 });
 }
 
 export async function GET(request: Request): Promise<Response> {
-  return runCron(request);
+  return acceptCron(request);
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return runCron(request);
+  return acceptCron(request);
 }

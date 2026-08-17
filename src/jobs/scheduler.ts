@@ -24,7 +24,7 @@ export async function handler(event: HandlerEvent = {}): Promise<{
   try {
     const watch = job === "watch" || job === "all" ? await runWatchNow() : null;
     const pendingRetries =
-      job === "watch" || job === "all" ? await retryPendingAnalyses() : null;
+      job === "watch" || job === "digest" || job === "all" ? await retryPendingAnalyses() : null;
     const digest = job === "digest" || job === "all" ? await runDailyDigest() : null;
     return { ok: true, job, watch, pendingRetries, digest };
   } finally {
@@ -48,7 +48,10 @@ export function startScheduler(): void {
   cron.schedule("0 8 * * *", () => {
     console.log(`[cron] daily digest ${new Date().toISOString()}`);
     connectDb()
-      .then(() => runDailyDigest())
+      .then(async () => {
+        await retryPendingAnalyses();
+        await runDailyDigest();
+      })
       .catch((error: unknown) => {
         console.error(error);
       });

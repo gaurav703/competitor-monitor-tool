@@ -63,7 +63,11 @@ export async function retryPendingAnalyses(): Promise<{
   let succeeded = 0;
   let failed = 0;
 
-  for (const log of pending) {
+  for (let i = 0; i < pending.length; i++) {
+    const log = pending[i];
+    if (!log) {
+      continue;
+    }
     const competitor = await CompetitorModel.findById(log.competitorId).lean();
     const userProduct =
       competitor && competitor.userProductId
@@ -142,7 +146,9 @@ export async function retryPendingAnalyses(): Promise<{
     }
 
     // Pace retries so the backup model's RPM isn't exhausted too.
-    await sleep(SLEEP_BETWEEN_LOGS_MS);
+    if (i < pending.length - 1) {
+      await sleep(SLEEP_BETWEEN_LOGS_MS);
+    }
   }
 
   console.log(`Pending retries done: ${succeeded} succeeded, ${failed} failed.`);

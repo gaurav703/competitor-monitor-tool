@@ -26,7 +26,43 @@ export type RawDiff = {
 export type WatchOptions = {
   /** When true (default for the live pipeline), Gemini runs on non-baseline diffs and ChangeLogs are saved. */
   analyze?: boolean;
+  /**
+   * Save non-baseline diffs as pending ChangeLogs without calling Gemini.
+   * Use on short HTTP cron so fetch/hash still finish if analysis is cut off.
+   */
+  deferAnalysis?: boolean;
+  /** Max concurrent source fetches. Only used when `deferAnalysis` is true. */
+  fetchConcurrency?: number;
 };
+
+const DEFAULT_DEFER_FETCH_CONCURRENCY = 4;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) {
+        return;
+      }
+      results[index] = await mapper(items[index] as T);
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => worker()));
+  return results;
+}
 
 export type DiffCheckResult = {
   competitorId: string;
@@ -186,8 +222,11 @@ export async function checkSource(params: {
   lastSeenItemKeys?: string[];
   userProduct?: UserProductContext;
   analyze?: boolean;
+  deferAnalysis?: boolean;
 }): Promise<DiffCheckResult> {
   const analyze = params.analyze ?? false;
+  const deferAnalysis = params.deferAnalysis ?? false;
+  const wantsAnalysis = analyze || deferAnalysis;
   const base = {
     competitorId: params.competitorId.toString(),
     competitorName: params.competitorName,
@@ -230,7 +269,7 @@ export async function checkSource(params: {
       changed = feedDiff.changed;
 
       feedAnalysisItems = feedDiff.newItems;
-      if (analyze && !isFirstCheck && feedAnalysisItems.length > 0) {
+      if (wantsAnalysis && !isFirstCheck && feedAnalysisItems.length > 0) {
         try {
           const recent = await recentChangeLogTitles(params.competitorId);
           const fresh = feedAnalysisItems.filter(
@@ -287,7 +326,7 @@ export async function checkSource(params: {
     let isMeaningful: boolean | null = null;
 
     const shouldAnalyze =
-      analyze &&
+      wantsAnalysis &&
       changed &&
       !isFirstCheck &&
       rawDiff &&
@@ -297,30 +336,40 @@ export async function checkSource(params: {
       let analysis: ChangeAnalysis;
       let analysisStatus: AnalysisStatus = "analyzed";
       let analysisError: string | null = null;
-      try {
-        analysis = await analyzeChange(
-          params.userProduct,
-          params.competitorName,
-          params.sourceType,
-          rawDiff
-        );
-      } catch (error: unknown) {
-        if (error instanceof AnalysisError && error.retryable) {
-          // All Gemini models quota-limited. Save the rawDiff now as
-          // "pending" so analyzePending can retry without re-fetching.
-          console.warn(
-            `Analysis deferred (all Gemini models exhausted) for ${params.competitorName} ${params.sourceType}; saved as pending.`
+      if (deferAnalysis) {
+        analysis = {
+          isMeaningful: false,
+          aiSummary: null,
+          relevantArea: null,
+          urgency: null,
+        };
+        analysisStatus = "pending";
+      } else {
+        try {
+          analysis = await analyzeChange(
+            params.userProduct,
+            params.competitorName,
+            params.sourceType,
+            rawDiff
           );
-          analysis = {
-            isMeaningful: false,
-            aiSummary: null,
-            relevantArea: null,
-            urgency: null,
-          };
-          analysisStatus = "pending";
-          analysisError = error.message;
-        } else {
-          throw error;
+        } catch (error: unknown) {
+          if (error instanceof AnalysisError && error.retryable) {
+            // All Gemini models quota-limited. Save the rawDiff now as
+            // "pending" so analyzePending can retry without re-fetching.
+            console.warn(
+              `Analysis deferred (all Gemini models exhausted) for ${params.competitorName} ${params.sourceType}; saved as pending.`
+            );
+            analysis = {
+              isMeaningful: false,
+              aiSummary: null,
+              relevantArea: null,
+              urgency: null,
+            };
+            analysisStatus = "pending";
+            analysisError = error.message;
+          } else {
+            throw error;
+          }
         }
       }
       if (analysisStatus === "analyzed") {
@@ -333,7 +382,7 @@ export async function checkSource(params: {
         rawDiff,
         analysis,
         analysisStatus,
-        analysisAttempts: analysisStatus === "pending" ? 1 : 0,
+        analysisAttempts: analysisStatus === "pending" ? (deferAnalysis ? 0 : 1) : 0,
         analysisError,
       });
     }
@@ -376,6 +425,10 @@ export async function runWatchForUserProduct(
   options: WatchOptions = {}
 ): Promise<DiffCheckResult[]> {
   const analyze = options.analyze ?? false;
+  const deferAnalysis = options.deferAnalysis ?? false;
+  const fetchConcurrency = deferAnalysis
+    ? Math.max(1, options.fetchConcurrency ?? DEFAULT_DEFER_FETCH_CONCURRENCY)
+    : 1;
 
   if (!Types.ObjectId.isValid(userProductId)) {
     throw new Error(`Invalid UserProduct id: ${userProductId}`);
@@ -414,76 +467,114 @@ export async function runWatchForUserProduct(
     }
   }
 
-  const results: DiffCheckResult[] = [];
+  type WorkItem =
+    | { kind: "ready"; result: DiffCheckResult }
+    | {
+        kind: "check";
+        params: Parameters<typeof checkSource>[0];
+      };
+
+  const work: WorkItem[] = [];
 
   for (const competitor of competitors) {
     for (const source of competitor.sources) {
       if (source.enabled === false) {
-        results.push({
-          competitorId: competitor._id.toString(),
-          competitorName: competitor.name,
-          sourceId: source._id?.toString() ?? "",
-          sourceType: source.type as SourceType,
-          url: source.url,
-          watcher: source.type,
-          changed: false,
-          isFirstCheck: false,
-          previousHash: source.lastCheckedHash ?? null,
-          currentHash: null,
-          rawDiff: null,
-          error: null,
-          ...emptyAnalysisFields(),
-          deduped: false,
-          skipped: true,
+        work.push({
+          kind: "ready",
+          result: {
+            competitorId: competitor._id.toString(),
+            competitorName: competitor.name,
+            sourceId: source._id?.toString() ?? "",
+            sourceType: source.type as SourceType,
+            url: source.url,
+            watcher: source.type,
+            changed: false,
+            isFirstCheck: false,
+            previousHash: source.lastCheckedHash ?? null,
+            currentHash: null,
+            rawDiff: null,
+            error: null,
+            ...emptyAnalysisFields(),
+            deduped: false,
+            skipped: true,
+          },
         });
         continue;
       }
 
       if (!source._id) {
-        results.push({
-          competitorId: competitor._id.toString(),
-          competitorName: competitor.name,
-          sourceId: "",
-          sourceType: source.type as SourceType,
-          url: source.url,
-          watcher: source.type,
-          changed: false,
-          isFirstCheck: true,
-          previousHash: source.lastCheckedHash ?? null,
-          currentHash: null,
-          rawDiff: null,
-          error: "Source is missing _id; cannot update hash.",
-          ...emptyAnalysisFields(),
-          deduped: false,
-          skipped: false,
+        work.push({
+          kind: "ready",
+          result: {
+            competitorId: competitor._id.toString(),
+            competitorName: competitor.name,
+            sourceId: "",
+            sourceType: source.type as SourceType,
+            url: source.url,
+            watcher: source.type,
+            changed: false,
+            isFirstCheck: true,
+            previousHash: source.lastCheckedHash ?? null,
+            currentHash: null,
+            rawDiff: null,
+            error: "Source is missing _id; cannot update hash.",
+            ...emptyAnalysisFields(),
+            deduped: false,
+            skipped: false,
+          },
         });
         continue;
       }
 
-      const result = await checkSource({
-        competitorId: competitor._id,
-        competitorName: competitor.name,
-        sourceId: source._id as Types.ObjectId,
-        sourceType: source.type as SourceType,
-        url: source.url,
-        selector: source.selector ?? null,
-        lastCheckedHash: source.lastCheckedHash ?? null,
-        lastSeenItemKeys: source.lastSeenItemKeys ?? [],
-        userProduct,
-        analyze,
+      work.push({
+        kind: "check",
+        params: {
+          competitorId: competitor._id,
+          competitorName: competitor.name,
+          sourceId: source._id as Types.ObjectId,
+          sourceType: source.type as SourceType,
+          url: source.url,
+          selector: source.selector ?? null,
+          lastCheckedHash: source.lastCheckedHash ?? null,
+          lastSeenItemKeys: source.lastSeenItemKeys ?? [],
+          userProduct,
+          analyze,
+          deferAnalysis,
+        },
       });
-      results.push(result);
     }
   }
 
-  return results;
+  const checks = work.filter(
+    (item): item is Extract<WorkItem, { kind: "check" }> => item.kind === "check"
+  );
+  const checkResults = await mapWithConcurrency(checks, fetchConcurrency, (item) =>
+    checkSource(item.params)
+  );
+
+  let checkIndex = 0;
+  return work.map((item) => {
+    if (item.kind === "ready") {
+      return item.result;
+    }
+    const result = checkResults[checkIndex];
+    checkIndex += 1;
+    if (!result) {
+      throw new Error("Internal error: missing checkSource result.");
+    }
+    return result;
+  });
 }
 
-export async function runWatchPipeline(): Promise<DiffCheckResult[]> {
+export async function runWatchPipeline(options: WatchOptions = {}): Promise<DiffCheckResult[]> {
   const products = await UserProductModel.find().lean();
   const all: DiffCheckResult[] = [];
   for (const product of products) {
-    const results = await runWatchForUserProduct(product._id.toString(), { analyze: true });
+    const results = await runWatchForUserProduct(product._id.toString(), {
+      analyze: options.analyze ?? true,
+      deferAnalysis: options.deferAnalysis,
+      fetchConcurrency: options.fetchConcurrency,
+    });
     all.push(...results);
   }
   return all;

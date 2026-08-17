@@ -1,6 +1,6 @@
 import { connectDb, disconnectDb } from "../config/db";
 import { runWatchPipeline } from "../services/diffService";
-import type { DiffCheckResult } from "../services/diffService";
+import type { DiffCheckResult, WatchOptions } from "../services/diffService";
 
 export type WatchSourceStatus =
   | "error"
@@ -8,6 +8,7 @@ export type WatchSourceStatus =
   | "baseline"
   | "unchanged"
   | "duplicate"
+  | "pending"
   | "analyzed";
 
 export type WatchSourceRow = {
@@ -29,6 +30,7 @@ export type WatchRunSummary = {
   baselines: number;
   changed: number;
   analyzed: number;
+  pending: number;
   meaningful: number;
   duplicates: number;
   skipped: number;
@@ -51,6 +53,9 @@ export function watchSourceStatus(row: DiffCheckResult): WatchSourceStatus {
   }
   if (row.deduped) {
     return "duplicate";
+  }
+  if (row.changeLogId && !row.analyzed) {
+    return "pending";
   }
   return "analyzed";
 }
@@ -75,6 +80,7 @@ export function summarizeWatchResults(results: DiffCheckResult[]): WatchRunSumma
     baselines: results.filter((row) => watchSourceStatus(row) === "baseline").length,
     changed: results.filter((row) => row.changed && !row.error && !row.skipped).length,
     analyzed: results.filter((row) => row.analyzed).length,
+    pending: results.filter((row) => watchSourceStatus(row) === "pending").length,
     meaningful: results.filter((row) => row.isMeaningful === true).length,
     duplicates: results.filter((row) => row.deduped).length,
     skipped: results.filter((row) => row.skipped).length,
@@ -83,11 +89,11 @@ export function summarizeWatchResults(results: DiffCheckResult[]): WatchRunSumma
   };
 }
 
-export async function runWatchNow(): Promise<WatchRunSummary> {
-  const results = await runWatchPipeline();
+export async function runWatchNow(options: WatchOptions = {}): Promise<WatchRunSummary> {
+  const results = await runWatchPipeline(options);
   const summary = summarizeWatchResults(results);
   console.log(
-    `Watch pipeline: ${summary.total} source(s), ${summary.fetched} fetched, ${summary.changed} changed, ${summary.analyzed} analyzed, ${summary.errors} error(s)`
+    `Watch pipeline: ${summary.total} source(s), ${summary.fetched} fetched, ${summary.changed} changed, ${summary.analyzed} analyzed, ${summary.pending} pending, ${summary.errors} error(s)`
   );
   for (const row of summary.sources) {
     if (row.status === "error") {
@@ -108,6 +114,10 @@ export async function runWatchNow(): Promise<WatchRunSummary> {
     }
     if (row.status === "duplicate") {
       console.log(`[DUPLICATE] ${row.competitorName} ${row.sourceType} skipped as duplicate of a recent change`);
+      continue;
+    }
+    if (row.status === "pending") {
+      console.log(`[PENDING] ${row.competitorName} ${row.sourceType} changeLog=${row.changeLogId}`);
       continue;
     }
     console.log(

@@ -45,10 +45,10 @@ Create two GET jobs. Use the same `CRON_SECRET` as in Vercel environment variabl
 
 | Job | What it does | URL | Schedule |
 | --- | --- | --- | --- |
-| `competitor-watch` | Fetch sources, hash, Gemini on real diffs | `https://YOUR_DOMAIN/api/cron/run?job=watch&secret=CRON_SECRET` | `0 */12 * * *` (every 12 hours) |
-| `competitor-digest` | Email meaningful changes to `ownerEmail` | `https://YOUR_DOMAIN/api/cron/run?job=digest&secret=CRON_SECRET` | `0 8 * * *` (daily; set timezone, e.g. Asia/Kolkata) |
+| `competitor-watch` | Fetch sources, hash, save diffs; Gemini runs after the HTTP response | `https://YOUR_DOMAIN/api/cron/run?job=watch&secret=CRON_SECRET` | `0 */12 * * *` (every 12 hours) |
+| `competitor-digest` | Retry any pending Gemini work, then email meaningful changes to `ownerEmail` | `https://YOUR_DOMAIN/api/cron/run?job=digest&secret=CRON_SECRET` | `0 8 * * *` (daily; set timezone, e.g. Asia/Kolkata) |
 
-The endpoint waits for the pipeline and returns **200** with a JSON body: what each source fetched (`watch.sources`: unchanged / baseline / analyzed / error), Gemini pending retries, and whether digest email was sent (`email.sent`, plus per-product reasons like `no_changes`, `already_emailed`, or `smtp_not_configured`). Raise cron-job.org’s request timeout if a watch run can exceed ~30s (Vercel can run up to 5 minutes). Check **Vercel → Logs** for `[UNCHANGED]`, `[BASELINE]`, `[ANALYZED]`, and digest lines.
+The endpoint returns **202 Accepted** immediately (`{ ok: true, accepted: true, job }`) so [cron-job.org’s 30s free-plan timeout](https://cron-job.org/en/faq/) does not mark the job failed. Fetching and hashing continue in the background (`after()`); Gemini is deferred to pending ChangeLogs and then `retryPendingAnalyses`. Check **Vercel → Logs** for `[UNCHANGED]`, `[BASELINE]`, `[PENDING]`, `[ANALYZED]`, `[RETRIED OK]`, and digest lines. Vercel Hobby still caps the background work at 60s; leftover pending logs are picked up on the next watch or digest.
 
 Do not schedule watch every 15 minutes — that burns Gemini quota and store rate limits.
 
